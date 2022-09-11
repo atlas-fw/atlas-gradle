@@ -26,8 +26,9 @@ plugins {
         // Documentation Generation
         id("org.jetbrains.dokka") version DOKKA
 
-        // Maven Publication
-        id("io.github.gradle-nexus.publish-plugin") version NEXUS_PUBLISH
+        // Gradle Plugin Portal Publication
+        id("com.gradle.plugin-publish") version GRADLE_PLUGIN_PUBLISH
+        `java-gradle-plugin`
         `maven-publish`
         signing
     }
@@ -37,22 +38,39 @@ plugins {
 val targetVersion = "1.8"
 // What JVM version this project is written in
 val sourceVersion = "1.8"
-// Which source-sets to add.
-val additionalSourceSets: Array<String> = arrayOf(
-    "api"
-)
 
-// Handle configurations lower down
-configurations()
+// Add `include` configuration for ShadowJar
+configurations {
+    val include by creating
+    // don't include in maven pom
+    compileOnly.get().extendsFrom(include)
+    // but also work in tests
+    testImplementation.get().extendsFrom(include)
+
+    // Makes all the configurations use the same Kotlin version.
+    all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlin") {
+                useVersion(Dependencies.KOTLIN)
+            }
+        }
+    }
+}
 
 // Project Dependencies
 dependencies {
     val include by configurations
 
     with(Dependencies) {
+        compileOnly(gradleApi())
+
         kotlinModules.forEach {
             implementation("org.jetbrains.kotlin", "kotlin-$it", KOTLIN)
         }
+
+        implementation("fr.stardustenterprises", "stargrad", STARGRAD)
+        implementation("fr.stardustenterprises", "plat4k", PLAT4K)
+
         testImplementation("org.jetbrains.kotlin", "kotlin-test", KOTLIN)
     }
 }
@@ -65,51 +83,8 @@ repositories {
     Repositories.mavenUrls.forEach(::maven)
 }
 
-fun Project.configurations() {
-    // Add `include` configuration for ShadowJar
-    configurations {
-        val include by creating
-        // don't include in maven pom
-        compileOnly.get().extendsFrom(include)
-        // but also work in tests
-        testImplementation.get().extendsFrom(include)
-
-        // Makes all the configurations use the same Kotlin version.
-        all {
-            resolutionStrategy.eachDependency {
-                if (requested.group == "org.jetbrains.kotlin") {
-                    useVersion(Dependencies.KOTLIN)
-                }
-            }
-        }
-    }
-}
-
 group = Coordinates.GROUP
 version = Coordinates.VERSION
-
-// Generate the additional source sets
-additionalSourceSets.forEach(::createSourceSet)
-
-fun createSourceSet(name: String, sourceRoot: String = "src/$name") {
-    sourceSets {
-        val main by sourceSets
-        val test by sourceSets
-
-        val sourceSet = create(name) {
-            java.srcDir("$sourceRoot/kotlin")
-            resources.srcDir("$sourceRoot/resources")
-
-            this.compileClasspath += main.compileClasspath
-            this.runtimeClasspath += main.runtimeClasspath
-        }
-
-        arrayOf(main, test).forEach {
-            it.compileClasspath += sourceSet.output
-            it.runtimeClasspath += sourceSet.output
-        }
-    }
-}
 
 // The latest commit ID
 val buildRevision: String = grgit.log()[0].id ?: "dev"
@@ -238,24 +213,7 @@ tasks {
                 manifest.attributes[k] = v
             }
         }
-
-        additionalSourceSets.forEach {
-            from(sourceSets[it].output)
-        }
         from("LICENSE")
-    }
-
-    additionalSourceSets.forEach {
-        // Custom artifact, only including the output of
-        // the source set and the LICENSE file.
-        create(it + "Jar", Jar::class) {
-            group = "build"
-
-            archiveClassifier.set(it)
-            from(sourceSets[it].output)
-
-            from("LICENSE")
-        }
     }
 
     // Source artifact, including everything the 'main' does but not compiled.
@@ -264,10 +222,6 @@ tasks {
 
         archiveClassifier.set("sources")
         from(sourceSets["main"].allSource)
-
-        additionalSourceSets.forEach {
-            from(sourceSets[it].allSource)
-        }
 
         this.manifest.from(jar.get().manifest)
 
@@ -294,10 +248,6 @@ tasks {
         this.configurations.clear()
         this.configurations += include
 
-        // Add the API source set to the ShadowJar
-        additionalSourceSets.forEach {
-            from(sourceSets[it].output)
-        }
         from("LICENSE")
 
         this.archiveClassifier.set(ShadowJar.classifier)
@@ -305,42 +255,35 @@ tasks {
 
         ShadowJar.packageRemappings.forEach(this::relocate)
     }
-
-    afterEvaluate {
-        // Task priority
-        val publishToSonatype by getting
-        val closeAndReleaseSonatypeStagingRepository by getting
-
-        closeAndReleaseSonatypeStagingRepository
-            .mustRunAfter(publishToSonatype)
-
-        // Wrapper task since calling both one after the other in IntelliJ
-        // seems to cause some problems.
-        create("releaseToSonatype") {
-            group = "publishing"
-
-            dependsOn(
-                publishToSonatype,
-                closeAndReleaseSonatypeStagingRepository
-            )
-        }
-    }
 }
 
 // Define the default artifacts' tasks
 val defaultArtifactTasks = arrayOf(
     tasks["sourcesJar"],
     tasks["javadocJar"]
-).also { arr ->
-    additionalSourceSets.forEach { set ->
-        arr.plus(tasks[set + "Jar"])
-    }
-}
+)
 
 // Declare the artifacts
 artifacts {
     defaultArtifactTasks.forEach(::archives)
     archives(tasks.shadowJar)
+}
+
+gradlePlugin {
+    plugins {
+        create("default") {
+            displayName = "Atlas Gradle"
+            description = ""
+            id = "me.xtrm.atlas.gradle"
+            implementationClass = "me.xtrm.atlas.gradle.AtlasPlugin"
+        }
+    }
+}
+
+pluginBundle {
+    vcsUrl = "https://github.com/${Coordinates.REPO_ID}"
+    website = "https://github.com/${Coordinates.REPO_ID}"
+    tags = listOf("atlas-framework")
 }
 
 publishing.publications {
@@ -390,14 +333,4 @@ publishing.publications {
             sign(this@create)
         }
     }
-}
-
-// Configure publishing to Maven Central
-nexusPublishing.repositories.sonatype {
-    nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
-    snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
-
-    // Skip this step if environment variables NEXUS_USERNAME or NEXUS_PASSWORD aren't set.
-    username.set(properties["NEXUS_USERNAME"] as? String ?: return@sonatype)
-    password.set(properties["NEXUS_PASSWORD"] as? String ?: return@sonatype)
 }

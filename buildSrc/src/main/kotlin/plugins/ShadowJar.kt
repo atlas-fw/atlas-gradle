@@ -6,7 +6,7 @@ object ShadowJar {
      *
      * Put blank if you want to override the default output jar.
      */
-    const val classifier = "all"
+    const val classifier = ""
 
     /**
      * Packages which should be moved
