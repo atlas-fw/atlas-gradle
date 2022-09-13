@@ -22,7 +22,9 @@ import kotlin.test.Test
 class TestRunner {
     @Test
     fun `test gradle plugin`() {
-        val projectRoot = File("test-project")
+        val projectRoot = File(
+            "src" / "test" / "resources" / "test-project-sdk"
+        )
         if (projectRoot.exists()) {
             GradleRunner.create()
                 .withProjectDir(projectRoot)
@@ -33,3 +35,6 @@ class TestRunner {
         }
     }
 }
+
+private operator fun String.div(other: String): String =
+    this + File.separator + other

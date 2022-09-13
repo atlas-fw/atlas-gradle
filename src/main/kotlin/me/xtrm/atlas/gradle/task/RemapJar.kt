@@ -19,9 +19,15 @@ package me.xtrm.atlas.gradle.task
 
 import fr.stardustenterprises.stargrad.task.StargradTask
 import fr.stardustenterprises.stargrad.task.Task
+import org.gradle.api.tasks.bundling.AbstractArchiveTask
 
 @Task("remap", group = "atlas gradle")
 open class RemapJar : StargradTask() {
+
+    internal fun targets(task: AbstractArchiveTask) {
+        dependsOn(task)
+    }
+
     override fun run() {
         println("Remapping shit")
     }

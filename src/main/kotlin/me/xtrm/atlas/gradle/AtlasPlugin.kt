@@ -21,9 +21,11 @@ import fr.stardustenterprises.stargrad.StargradPlugin
 import me.xtrm.atlas.gradle.ext.AtlasExtension
 import me.xtrm.atlas.gradle.task.GenStub
 import me.xtrm.atlas.gradle.task.RemapJar
+import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.plugins.JavaLibraryPlugin
 import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.plugins.JavaPluginExtension
+import org.gradle.jvm.tasks.Jar
 
 
 open class AtlasPlugin : StargradPlugin() {
@@ -35,71 +37,68 @@ open class AtlasPlugin : StargradPlugin() {
         with(project) {
             applyPlugin<JavaLibraryPlugin>()
 
-            repositories {
-                mavenCentral()
-                mavenLocal()
-            }
-
-            configurations {
-                val api =
-                    getByName(JavaPlugin.API_CONFIGURATION_NAME)
-                val implementation =
-                    getByName(JavaPlugin.IMPLEMENTATION_CONFIGURATION_NAME)
-
-                val loader = create(LOADER_CONFIGURATION)
-                val mapping = create(MAPPING_CONFIGURATION)
-                implementation.extendsFrom(loader)
-                api.extendsFrom(mapping)
-            }
-
             extensions.findByType(JavaPluginExtension::class.java)?.apply {
+                repositories {
+                    mavenCentral()
+                    mavenLocal()
+                }
+
+                atlasExtension = registerExtension()
+                registerTask<RemapJar>().also {
+                    tasks.getByName("assemble").dependsOn(it)
+                }
+
+                val genStubs = registerTask<GenStub>()
+                sourceSets.filter { it.name != MAPPING_SOURCESET }.forEach {
+                    tasks.getByName(it.compileJavaTaskName).dependsOn(genStubs)
+                }
+
+                configurations {
+                    fun createAndExtend(name: String, extendsFrom: String) =
+                        create(name).also { getByName(extendsFrom).extendsFrom(it) }
+
+                    createAndExtend(LOADER_CONFIGURATION, JavaPlugin.IMPLEMENTATION_CONFIGURATION_NAME)
+                    createAndExtend(MAPPING_CONFIGURATION, JavaPlugin.API_CONFIGURATION_NAME)
+                    createAndExtend(REMAPPED_CONFIGURATION, JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME)
+                }
+
                 sourceSets {
-                    val mappingSet = create("mapping") {
-                        it.java.srcDir("src/${it.name}/java")
-                        it.resources.srcDir("src/${it.name}/resources")
+                    val mappingSet = create(MAPPING_SOURCESET)
+
+                    // This is pretty shit since it's also adding the
+                    // kotlin runtime to the classpath of the mappings set.
+                    // This is unfortunately unavoidable to prevent annoying
+                    // compiler warnings about missing annotations constants.
+                    dependencies.add(
+                        mappingSet.compileOnlyConfigurationName,
+                        ATLAS_ANNOTATIONS
+                    )
+
+                    (tasks.findByName(JavaPlugin.JAR_TASK_NAME) as Jar).apply {
+                        from(mappingSet.output)
                     }
 
-                    forEach { set ->
-                        dependencies.add(
-                            set.implementationConfigurationName,
-                            ATLAS_ANNOTATIONS
-                        )
-                    }
-
-                    val genStubs = registerTask<GenStub>()
-                    mappingSet {
-                        println("stubs depend on ${this.compileJavaTaskName}")
-                        genStubs.get().dependsOn(this.compileJavaTaskName)
-                    }
-
-                    filter { it.name != "mapping" }.forEach {
-                        println("${it.compileJavaTaskName} depends on stubs")
-                        tasks.getByName(it.compileJavaTaskName).dependsOn(genStubs)
-                    }
-
-                    afterEvaluate {
-                        // task.reobf(project.tasks.getByName("jar"), object : Action<ArtifactSpec?>() {
-                        //     fun execute(arg0: ArtifactSpec) {
-                        //         val javaConv = project.convention.plugins["java"] as JavaPluginConvention?
-                        //         arg0.setClasspath(javaConv!!.sourceSets.getByName("main").compileClasspath)
-                        //     }
-                        // })
+                    tasks.create(mappingSet.jarTaskName, Jar::class.java) {
+                        it.from(mappingSet.output)
+                        it.archiveClassifier.set(mappingSet.name)
+                        // Let's hope this isn't a terrible idea down the line
+                        it.duplicatesStrategy = DuplicatesStrategy.INCLUDE
+                    }.also {
+                        genStubs.get().dependsOn(it)
                     }
                 }
             }
-
-            atlasExtension = registerExtension()
-
-            val remapJar = registerTask<RemapJar>()
-            tasks.getByName("assemble").dependsOn(remapJar)
         }
     }
 
     companion object {
+        internal const val MAPPING_SOURCESET = "mappings"
+
         internal const val LOADER_CONFIGURATION = "loader"
         internal const val MAPPING_CONFIGURATION = "mapping"
+        internal const val REMAPPED_CONFIGURATION = "atlasInternalRemapped"
 
         internal const val ATLAS_ANNOTATIONS =
-            "me.xtrm.atlas:annotations:+"
+            "me.xtrm.atlas:annotations:0.0.1"
     }
 }

@@ -19,8 +19,8 @@ package me.xtrm.atlas.gradle
 
 import org.gradle.api.Project
 
-inline fun <reified T> Project.applyPlugin() =
+internal inline fun <reified T> Project.applyPlugin() =
     this.pluginManager.apply(T::class.java)
 
-operator fun <T: Any> T?.invoke(block: T.() -> Unit) =
+internal operator fun <T: Any> T?.invoke(block: T.() -> Unit) =
     this?.block()

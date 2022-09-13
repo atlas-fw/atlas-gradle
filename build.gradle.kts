@@ -71,6 +71,8 @@ dependencies {
         implementation("fr.stardustenterprises", "stargrad", STARGRAD)
         implementation("fr.stardustenterprises", "plat4k", PLAT4K)
 
+        implementation("me.xtrm.atlas", "annotations", "0.0.1")
+
         testImplementation("org.jetbrains.kotlin", "kotlin-test", KOTLIN)
     }
 }
@@ -260,7 +262,7 @@ tasks {
 // Define the default artifacts' tasks
 val defaultArtifactTasks = arrayOf(
     tasks["sourcesJar"],
-    tasks["javadocJar"]
+//    tasks["javadocJar"],
 )
 
 // Declare the artifacts

@@ -20,6 +20,8 @@ package me.xtrm.atlas.gradle.task
 import fr.stardustenterprises.stargrad.task.StargradTask
 import fr.stardustenterprises.stargrad.task.Task
 import me.xtrm.atlas.gradle.AtlasPlugin
+import org.gradle.api.tasks.bundling.AbstractArchiveTask
+import java.io.File
 import java.io.File.separator
 
 @Task("genStubs", group = "atlas gradle")
@@ -31,11 +33,23 @@ open class GenStub : StargradTask() {
     }
 
     override fun run() {
+        val sourceMappingJars = mutableListOf<File>()
+
+        (project.tasks.findByName("mappingJar") as? AbstractArchiveTask)?.let {
+            it.archiveFile.orNull?.asFile?.takeIf(File::exists)
+                ?.also(sourceMappingJars::add)
+        }
         project.configurations.getByName(AtlasPlugin.MAPPING_CONFIGURATION)
             .resolvedConfiguration
             .resolvedArtifacts
             .forEach {
-                println("resolved: $it")
+                it.file.takeIf(File::exists)?.also(sourceMappingJars::add)
             }
+
+        if (sourceMappingJars.isEmpty()) {
+            return
+        }
+        println("Scanning ${sourceMappingJars.size} mapping jars...")
+        sourceMappingJars.map(File::getAbsolutePath).forEach { println(it) }
     }
 }
