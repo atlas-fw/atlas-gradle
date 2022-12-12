@@ -15,20 +15,10 @@
  * along with atlas-gradle.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package me.xtrm.atlas.gradle.task
+package enterprises.stardust.atlas.gradle.runtime
 
-import fr.stardustenterprises.stargrad.task.StargradTask
-import fr.stardustenterprises.stargrad.task.Task
-import org.gradle.api.tasks.bundling.AbstractArchiveTask
+import org.gradle.api.model.ObjectFactory
 
-@Task("remap", group = "atlas gradle")
-open class RemapJar : StargradTask() {
+class RuntimeConfiguration(objects: ObjectFactory) {
 
-    internal fun targets(task: AbstractArchiveTask) {
-        dependsOn(task)
-    }
-
-    override fun run() {
-        println("Remapping shit")
-    }
 }

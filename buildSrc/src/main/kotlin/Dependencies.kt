@@ -1,4 +1,4 @@
-private const val kotlinVersion = "1.7.10"
+private const val kotlinVersion = "1.7.21"
 
 object Plugins {
     const val KOTLIN = kotlinVersion
@@ -12,7 +12,9 @@ object Plugins {
 
 object Dependencies {
     const val KOTLIN = kotlinVersion
-    const val STARGRAD = "0.5.2"
+    const val JACKSON_DATABIND = "2.14.1"
+    const val JACKSON_KOTLIN = "2.9.8"
+    const val STARGRAD = "0.5.4"
     const val PLAT4K = "1.6.3"
 
     val kotlinModules = arrayOf("stdlib")

@@ -15,15 +15,10 @@
  * along with atlas-gradle.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package me.xtrm.atlas.gradle.ext
+package enterprises.stardust.atlas.dev;
 
-import fr.stardustenterprises.stargrad.ext.Extension
-import fr.stardustenterprises.stargrad.ext.StargradExtension
-import org.gradle.api.Project
+public class RuntimeMain {
+    public static void main(String... args) {
 
-@Extension("atlas")
-open class AtlasExtension(
-    project: Project
-) : StargradExtension(project) {
-
+    }
 }

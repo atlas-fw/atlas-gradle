@@ -15,12 +15,31 @@
  * along with atlas-gradle.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package me.xtrm.atlas.gradle
+package enterprises.stardust.atlas.gradle
 
+import enterprises.stardust.stargrad.task.StargradTask
+import enterprises.stardust.stargrad.task.Task
+import org.gradle.api.DefaultTask
 import org.gradle.api.Project
+import kotlin.reflect.KClass
 
 internal inline fun <reified T> Project.applyPlugin() =
     this.pluginManager.apply(T::class.java)
 
 internal operator fun <T: Any> T?.invoke(block: T.() -> Unit) =
     this?.block()
+
+/**
+ * Wrapper around the usual task registration to make it work with [Task] when
+ * the task class cannot extend [StargradTask].
+ */
+internal fun <T: DefaultTask> KClass<T>.createTask(
+    project: Project,
+    init: T.() -> Unit = {}
+): T {
+    val taskAnnotation = this.java.getAnnotation(Task::class.java)
+    return project.tasks.create(taskAnnotation.name, this.java) {
+        it.group = taskAnnotation.group
+        init(it)
+    }
+}

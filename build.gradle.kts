@@ -64,14 +64,18 @@ dependencies {
     with(Dependencies) {
         compileOnly(gradleApi())
 
+        include(project(":dev-runtime"))
+
         kotlinModules.forEach {
             implementation("org.jetbrains.kotlin", "kotlin-$it", KOTLIN)
         }
+        implementation("com.fasterxml.jackson.core", "jackson-databind", JACKSON_DATABIND)
+        implementation("com.fasterxml.jackson.module", "jackson-module-kotlin", JACKSON_KOTLIN)
 
-        implementation("fr.stardustenterprises", "stargrad", STARGRAD)
+        implementation("enterprises.stardust", "stargrad", STARGRAD)
         implementation("fr.stardustenterprises", "plat4k", PLAT4K)
 
-        implementation("me.xtrm.atlas", "annotations", "0.0.1")
+        include("com.github.atlas-fw", "annotations", "a63069a7b4")
 
         testImplementation("org.jetbrains.kotlin", "kotlin-test", KOTLIN)
     }
@@ -119,7 +123,7 @@ tasks {
     compileKotlin {
         kotlinOptions {
             jvmTarget = targetVersion
-            freeCompilerArgs = listOf(
+            freeCompilerArgs += listOf(
                 "-opt-in=kotlin.RequiresOptIn",
             )
         }
@@ -276,8 +280,8 @@ gradlePlugin {
         create("default") {
             displayName = "Atlas Gradle"
             description = ""
-            id = "me.xtrm.atlas.gradle"
-            implementationClass = "me.xtrm.atlas.gradle.AtlasPlugin"
+            id = "enterprises.stardust.atlas.gradle"
+            implementationClass = "enterprises.stardust.atlas.gradle.AtlasPlugin"
         }
     }
 }

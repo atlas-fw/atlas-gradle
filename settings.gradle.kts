@@ -4,3 +4,4 @@ pluginManagement.repositories {
     mavenLocal()
     gradlePluginPortal()
 }
+include("dev-runtime")
