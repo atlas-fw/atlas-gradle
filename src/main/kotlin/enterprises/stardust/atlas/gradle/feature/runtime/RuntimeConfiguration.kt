@@ -15,15 +15,10 @@
  * along with atlas-gradle.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package enterprises.stardust.atlas.gradle.runtime
+package enterprises.stardust.atlas.gradle.feature.runtime
 
-import enterprises.stardust.stargrad.task.StargradTask
+import org.gradle.api.model.ObjectFactory
 
-/**
- * @author xtrm
- * @since 0.0.1
- */
-open class DownloadJar : StargradTask() {
-    override fun run() {
-    }
+class RuntimeConfiguration(objects: ObjectFactory) {
+
 }

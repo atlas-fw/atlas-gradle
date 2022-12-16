@@ -5,3 +5,4 @@ pluginManagement.repositories {
     gradlePluginPortal()
 }
 include("dev-runtime")
+include("mc-metadata")

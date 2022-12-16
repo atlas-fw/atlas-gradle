@@ -15,7 +15,7 @@
  * along with atlas-gradle.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package enterprises.stardust.atlas.gradle.runtime
+package enterprises.stardust.atlas.gradle.feature.runtime
 
 import enterprises.stardust.atlas.dev.RuntimeMain
 import java.io.FileOutputStream

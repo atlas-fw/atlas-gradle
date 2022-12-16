@@ -15,7 +15,7 @@
  * along with atlas-gradle.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package enterprises.stardust.atlas.gradle.runtime
+package enterprises.stardust.atlas.gradle.feature.runtime
 
 import enterprises.stardust.stargrad.task.Task
 import org.gradle.api.tasks.JavaExec

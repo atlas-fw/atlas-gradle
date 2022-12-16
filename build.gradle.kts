@@ -69,6 +69,8 @@ dependencies {
         kotlinModules.forEach {
             implementation("org.jetbrains.kotlin", "kotlin-$it", KOTLIN)
         }
+
+        implementation("com.google.guava", "guava", GUAVA)
         implementation("com.fasterxml.jackson.core", "jackson-databind", JACKSON_DATABIND)
         implementation("com.fasterxml.jackson.module", "jackson-module-kotlin", JACKSON_KOTLIN)
 

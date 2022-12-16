@@ -15,7 +15,7 @@
  * along with atlas-gradle.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package enterprises.stardust.atlas.gradle.stubgen
+package enterprises.stardust.atlas.gradle.feature.stubgen
 
 import org.gradle.api.model.ObjectFactory
 

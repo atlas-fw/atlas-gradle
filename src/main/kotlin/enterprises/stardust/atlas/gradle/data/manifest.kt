@@ -17,7 +17,7 @@
 
 package enterprises.stardust.atlas.gradle.data
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import enterprises.stardust.atlas.gradle.objectMapper
 import java.net.URL
 
 /**
@@ -37,18 +37,18 @@ data class VersionManifest(
     val versions: List<VersionMetadata>
 ) {
     companion object {
-        private val mapper = jacksonObjectMapper()
+        private val url: URL = URL(MANIFEST_URL)
 
         @JvmStatic
         fun fetch(): VersionManifest =
-            mapper.readValue(
-                URL(MANIFEST_URL),
+            objectMapper.readValue(
+                url,
                 VersionManifest::class.java
             )
 
         @JvmStatic
         fun parse(json: String): VersionManifest =
-            mapper.readValue(
+            objectMapper.readValue(
                 json,
                 VersionManifest::class.java
             )
@@ -75,7 +75,7 @@ data class LatestMetadata(
 data class VersionMetadata(
     val id: String,
     val type: String,
-    val url: String,
+    val url: URL,
     val time: String,
     val releaseTime: String,
     val sha1: String,

@@ -12,6 +12,7 @@ object Plugins {
 
 object Dependencies {
     const val KOTLIN = kotlinVersion
+    const val GUAVA = "31.1-jre"
     const val JACKSON_DATABIND = "2.14.1"
     const val JACKSON_KOTLIN = "2.9.8"
     const val STARGRAD = "0.5.4"

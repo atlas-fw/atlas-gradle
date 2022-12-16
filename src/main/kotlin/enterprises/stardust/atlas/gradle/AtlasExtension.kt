@@ -17,8 +17,8 @@
 
 package enterprises.stardust.atlas.gradle
 
-import enterprises.stardust.atlas.gradle.runtime.RuntimeConfiguration
-import enterprises.stardust.atlas.gradle.stubgen.StubConfiguration
+import enterprises.stardust.atlas.gradle.feature.runtime.RuntimeConfiguration
+import enterprises.stardust.atlas.gradle.feature.stubgen.StubConfiguration
 import enterprises.stardust.stargrad.ext.Extension
 import enterprises.stardust.stargrad.ext.StargradExtension
 import org.gradle.api.Project
