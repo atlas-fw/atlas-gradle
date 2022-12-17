@@ -1,5 +1,3 @@
-@file:Suppress("UNUSED_VARIABLE")
-
 import plugins.ShadowJar
 import java.net.URL
 import java.time.OffsetDateTime
@@ -8,7 +6,6 @@ import java.time.format.DateTimeFormatter
 plugins {
     with(Plugins) {
         // Language Plugins
-        `java-library`
         kotlin("jvm") version KOTLIN
 
         // Git Repo Information
@@ -117,23 +114,33 @@ blossom {
     }
 }
 
+allprojects {
+    apply(plugin = "java-library")
+    if (project.name != "dev-runtime") {
+        apply(plugin = "org.jetbrains.kotlin.jvm")
+    }
+
+    tasks {
+        // Configure JVM versions
+        if (project.name != "dev-runtime") {
+            compileKotlin {
+                kotlinOptions {
+                    jvmTarget = targetVersion
+                    freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
+                }
+            }
+        }
+
+        compileJava {
+            targetCompatibility = targetVersion
+            sourceCompatibility = sourceVersion
+        }
+    }
+}
+
 tasks {
     test {
         useJUnitPlatform()
-    }
-
-    // Configure JVM versions
-    compileKotlin {
-        kotlinOptions {
-            jvmTarget = targetVersion
-            freeCompilerArgs += listOf(
-                "-opt-in=kotlin.RequiresOptIn",
-            )
-        }
-    }
-    compileJava {
-        targetCompatibility = targetVersion
-        sourceCompatibility = sourceVersion
     }
 
     dokkaHtml {
