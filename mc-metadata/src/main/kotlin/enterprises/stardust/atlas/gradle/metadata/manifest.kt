@@ -22,7 +22,7 @@ import java.net.URL
 /**
  * The current Version Manifest URL.
  */
-internal const val MANIFEST_URL =
+const val MANIFEST_URL =
     "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 
 /**
@@ -34,25 +34,7 @@ internal const val MANIFEST_URL =
 data class VersionManifest(
     val latest: LatestMetadata,
     val versions: List<VersionMetadata>
-) {
-    companion object {
-        private val url: URL = URL(MANIFEST_URL)
-
-        @JvmStatic
-        fun fetch(): VersionManifest =
-            objectMapper.readValue(
-                url,
-                VersionManifest::class.java
-            )
-
-        @JvmStatic
-        fun parse(json: String): VersionManifest =
-            objectMapper.readValue(
-                json,
-                VersionManifest::class.java
-            )
-    }
-}
+) { companion object }
 
 /**
  * Representation of the latest version metadata.

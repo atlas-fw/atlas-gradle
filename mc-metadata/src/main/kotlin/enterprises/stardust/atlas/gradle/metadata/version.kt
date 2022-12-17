@@ -49,43 +49,7 @@ data class VersionJson(
     val jvmArguments: List<*>
         get() = arguments?.jvm ?: emptyList<String>() //TODO: Add JVM arguments
 
-    companion object {
-        @JvmStatic
-        fun fetch(url: URL, hash: String? = null): VersionJson {
-            val path = AtlasCache.cacheDir.resolve("versions")
-                .also { it.createDirectories() }
-                .resolve(
-                    url.path.substringAfterLast("/")
-                        .substringBefore(".json")
-                )
-
-            val file = AtlasCache.cacheFile(
-                path,
-                "version.json",
-                url
-            ) {
-                if (hash != null) return@cacheFile hash
-                if (!it.exists()) {
-                    // if the file doesn't exist, return a random string to
-                    // force the download
-                    UUID.randomUUID().toString()
-                } else {
-                    // if the file exists, return the hash of the file
-                    @Suppress("DEPRECATION")
-                    Hashing.sha1().hashBytes(it.readBytes()).toString()
-                }
-            }
-
-            return from(file.readText())
-        }
-
-        @JvmStatic
-        fun from(json: String): VersionJson =
-            objectMapper.readValue(
-                json,
-                VersionJson::class.java
-            )
-    }
+    companion object
 }
 
 data class Arguments(
