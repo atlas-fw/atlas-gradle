@@ -22,5 +22,5 @@ import org.gradle.api.Project
 internal inline fun <reified T> Project.applyPlugin() =
     this.pluginManager.apply(T::class.java)
 
-internal operator fun <T: Any> T?.invoke(block: T.() -> Unit) =
+internal operator fun <T : Any> T?.invoke(block: T.() -> Unit) =
     this?.block()

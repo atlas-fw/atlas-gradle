@@ -23,7 +23,10 @@ import enterprises.stardust.atlas.gradle.feature.remap.RemapJar
 import enterprises.stardust.atlas.gradle.feature.runtime.Download
 import enterprises.stardust.atlas.gradle.feature.runtime.runtimeJar
 import enterprises.stardust.atlas.gradle.feature.stubgen.GenStubs
-import enterprises.stardust.atlas.gradle.metadata.*
+import enterprises.stardust.atlas.gradle.metadata.VersionJson
+import enterprises.stardust.atlas.gradle.metadata.VersionManifest
+import enterprises.stardust.atlas.gradle.metadata.fetch
+import enterprises.stardust.atlas.gradle.metadata.from
 import enterprises.stardust.stargrad.StargradPlugin
 import org.gradle.api.artifacts.Dependency
 import org.gradle.api.file.DuplicatesStrategy
@@ -154,8 +157,8 @@ open class AtlasPlugin : StargradPlugin() {
         if (runtimesFound.isEmpty()) return
         if (runtimesFound.size > 1) {
             throw IllegalStateException(
-                "Found multiple runtimes in the runtimeOnly configuration: "
-                    + runtimesFound.joinToString { it.version.toString() }
+                "Found multiple runtimes in the runtimeOnly configuration: " +
+                    runtimesFound.joinToString { it.version.toString() }
             )
         }
 
@@ -168,7 +171,7 @@ open class AtlasPlugin : StargradPlugin() {
     ) = with(project) {
         println("Found Minecraft runtime: ${dep.group}:${dep.name}:${dep.version}")
 
-        //download appropriate runtime
+        // download appropriate runtime
         val versionMeta = versionManifest.versions.firstOrNull {
             it.id == dep.version
         } ?: throw IllegalStateException(
@@ -259,7 +262,6 @@ open class AtlasPlugin : StargradPlugin() {
         }
     }
 
-    @Suppress("DEPRECATION")
     private fun fetchVersionManifest(): VersionManifest {
         val filePath = AtlasCache.cacheDir.resolve("version_metadata_v2.json")
         val skipDownload = filePath.exists()
@@ -305,7 +307,5 @@ open class AtlasPlugin : StargradPlugin() {
 
         internal const val ATLAS_ANNOTATIONS =
             "com.github.atlas-fw:annotations:a63069a7b4"
-        internal const val ATLAS_LOADER =
-            "com.github.atlas-fw:loader:1.0.0-alpha.1"
     }
 }
