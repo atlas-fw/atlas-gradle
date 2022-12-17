@@ -1,4 +1,5 @@
 private const val kotlinVersion = "1.7.21"
+private const val jacksonVersion = "2.14.1"
 
 object Plugins {
     const val KOTLIN = kotlinVersion
@@ -13,7 +14,8 @@ object Plugins {
 object Dependencies {
     const val KOTLIN = kotlinVersion
     const val GUAVA = "31.1-jre"
-    const val JACKSON_DATABIND = "2.14.1"
+    const val JACKSON_DATABIND = jacksonVersion
+    const val JACKSON_ANNOTATIONS = jacksonVersion
     const val JACKSON_KOTLIN = "2.9.8"
     const val STARGRAD = "0.5.4"
     const val PLAT4K = "1.6.3"

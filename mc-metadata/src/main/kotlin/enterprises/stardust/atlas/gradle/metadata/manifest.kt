@@ -15,9 +15,8 @@
  * along with atlas-gradle.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package enterprises.stardust.atlas.gradle.data
+package enterprises.stardust.atlas.gradle.metadata
 
-import enterprises.stardust.atlas.gradle.objectMapper
 import java.net.URL
 
 /**

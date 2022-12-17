@@ -11,4 +11,7 @@ repositories {
 }
 
 dependencies {
+    with(Dependencies) {
+        implementation("com.fasterxml.jackson.core", "jackson-annotations", JACKSON_ANNOTATIONS)
+    }
 }

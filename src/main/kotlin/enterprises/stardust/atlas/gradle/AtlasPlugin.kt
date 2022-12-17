@@ -19,22 +19,25 @@ package enterprises.stardust.atlas.gradle
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import enterprises.stardust.atlas.gradle.data.VersionJson
-import enterprises.stardust.atlas.gradle.data.VersionManifest
 import enterprises.stardust.atlas.gradle.feature.remap.RemapJar
 import enterprises.stardust.atlas.gradle.feature.runtime.Download
+import enterprises.stardust.atlas.gradle.feature.runtime.runtimeJar
 import enterprises.stardust.atlas.gradle.feature.stubgen.GenStubs
+import enterprises.stardust.atlas.gradle.metadata.*
 import enterprises.stardust.stargrad.StargradPlugin
 import org.gradle.api.artifacts.Dependency
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.plugins.JavaLibraryPlugin
 import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.plugins.JavaPluginExtension
+import org.gradle.api.tasks.JavaExec
+import org.gradle.internal.hash.Hashing
 import org.gradle.jvm.tasks.Jar
-import java.io.IOException
 import java.nio.file.Files
-import java.nio.file.Path
 import java.nio.file.StandardOpenOption
+import java.util.*
+import kotlin.io.path.exists
+import kotlin.io.path.readBytes
 import kotlin.io.path.readText
 
 /**
@@ -53,21 +56,17 @@ open class AtlasPlugin : StargradPlugin() {
     internal lateinit var atlasExtension: AtlasExtension
     internal lateinit var versionManifest: VersionManifest
 
-    private lateinit var downloadClient: Download
-    private lateinit var downloadServer: Download
-
     override fun applyPlugin() {
         with(project) {
             AtlasCache.project = this
 
             applyPlugin<JavaLibraryPlugin>()
 
-            versionManifest = fetchVersionManifest(
-                AtlasCache.cacheDir.resolve("version_manifest_v2.json")
-            )
+            versionManifest = fetchVersionManifest()
             println(
                 PROPAGANDA.format(
-                    versionManifest.latest.release, versionManifest.latest.snapshot
+                    versionManifest.latest.release,
+                    versionManifest.latest.snapshot
                 )
             )
 
@@ -84,8 +83,6 @@ open class AtlasPlugin : StargradPlugin() {
             registerTask<RemapJar>().also {
                 tasks.getByName("assemble").dependsOn(it)
             }
-
-            downloadClient = tasks.create("downloadClient", Download::class.java)
 
             val genStubs = registerTask<GenStubs>()
             configurations {
@@ -106,17 +103,18 @@ open class AtlasPlugin : StargradPlugin() {
             }
 
             extensions.findByType(JavaPluginExtension::class.java)!!.sourceSets {
-                val facadesSet = create(FACADES_SOURCESET)
+                val facadesSet = maybeCreate(FACADES_SOURCESET)
 
-                // This is pretty shit since it's also adding the
-                // kotlin runtime to the classpath of the mappings set.
-                // This is unfortunately unavoidable to prevent annoying
-                // compiler warnings about missing annotations constants.
+                // This is pretty shit since it's also adding the kotlin runtime
+                // to the classpath of the mappings set. This is unfortunately
+                // unavoidable to prevent annoying compiler warnings about
+                // missing annotations constants.
                 dependencies.add(
-                    facadesSet.compileOnlyConfigurationName, ATLAS_ANNOTATIONS
+                    facadesSet.compileOnlyConfigurationName,
+                    ATLAS_ANNOTATIONS
                 )
 
-                (tasks.findByName(JavaPlugin.JAR_TASK_NAME) as Jar).apply {
+                (tasks.findByName(JavaPlugin.JAR_TASK_NAME) as Jar) {
                     from(facadesSet.output)
                 }
 
@@ -154,7 +152,6 @@ open class AtlasPlugin : StargradPlugin() {
         }.onEach { runtime.dependencies.remove(it) }
 
         if (runtimesFound.isEmpty()) return
-
         if (runtimesFound.size > 1) {
             throw IllegalStateException(
                 "Found multiple runtimes in the runtimeOnly configuration: "
@@ -167,92 +164,124 @@ open class AtlasPlugin : StargradPlugin() {
     }
 
     private fun handleMinecraftRuntime(
-        minecraftRuntime: Dependency,
+        dep: Dependency,
     ) = with(project) {
-        println("Found Minecraft runtime: $minecraftRuntime")
+        println("Found Minecraft runtime: ${dep.group}:${dep.name}:${dep.version}")
 
         //download appropriate runtime
         val versionMeta = versionManifest.versions.firstOrNull {
-            it.id == minecraftRuntime.version
-        } ?: throw (IllegalStateException(
-            "Could not find Minecraft version ${minecraftRuntime.version}"
+            it.id == dep.version
+        } ?: throw IllegalStateException(
+            "Could not find Minecraft version ${dep.version}"
         ).also {
             logger.error(it.message, it)
-        })
-
+        }
         val versionJson = VersionJson.fetch(versionMeta.url)
-        val client = versionJson.downloads.client
-        val server = versionJson.downloads.server
-        if (server == null) {
-            logger.warn("Server download not available for $minecraftRuntime")
+
+        val clientHash = AtlasCache.resolveDependencyPath(
+            dep.group + ":" + dep.name + ":" + dep.version + ":client",
+        ).let { (parent, name) ->
+            val file = parent.resolve(name)
+            if (file.exists())
+                Hashing.sha1().hashBytes(file.readBytes()).toString()
+            else
+                null
+        } ?: UUID.randomUUID().toString()
+
+        val downloadClient = project.tasks.register(
+            "downloadClient",
+            Download::class.java,
+            dep.group + ":" + dep.name + ":" + dep.version + ":client",
+            versionJson.downloads.client.url,
+            versionJson.downloads.client.sha1,
+            clientHash,
+        ).also {
+            it.get().group = "atlas gradle"
         }
 
-        print("Downloading Minecraft client JAR...")
-        System.out.flush()
-        val clientJar = AtlasCache.cacheDependency(
-            minecraftRuntime.group!!,
-            minecraftRuntime.name,
-            minecraftRuntime.version!!,
-            classifier = "client",
-            url = client.url,
-        ) { client.sha1 }
-        println(" Done")
+        project.tasks.register(
+            "runClient",
+            JavaExec::class.java,
+        ) {
+            it.group = "atlas gradle"
+            it.dependsOn(downloadClient)
 
-        if (server != null) {
-            print("Downloading Minecraft server JAR...")
-            System.out.flush()
-            val serverJar = AtlasCache.cacheDependency(
-                minecraftRuntime.group!!,
-                minecraftRuntime.name,
-                minecraftRuntime.version!!,
-                classifier = "server",
-                url = server.url,
-            ) { server.sha1 }
-            println(" Done")
+            it.mainClass.set("enterprises.stardust.atlas.dev.Entrypoint")
+            it.classpath += files(
+                runtimeJar,
+                downloadClient.get().target,
+                configurations.getByName(JavaPlugin.COMPILE_CLASSPATH_CONFIGURATION_NAME),
+                configurations.getByName(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME),
+            )
+            it.jvmArgs = listOf<String>()
+            it.args = listOf<String>()
         }
 
-        //download libraries
-        // -> download proper natives
+        if (versionJson.downloads.server == null) return@with
 
+        val serverHash = AtlasCache.resolveDependencyPath(
+            dep.group + ":" + dep.name + ":" + dep.version + ":server",
+        ).let { (parent, name) ->
+            val file = parent.resolve(name)
+            if (file.exists())
+                Hashing.sha1().hashBytes(file.readBytes()).toString()
+            else
+                null
+        } ?: UUID.randomUUID().toString()
+
+        val downloadServer = project.tasks.register(
+            "downloadServer",
+            Download::class.java,
+            dep.group + ":" + dep.name + ":" + dep.version + ":server",
+            versionJson.downloads.server!!.url,
+            versionJson.downloads.server!!.sha1,
+            serverHash,
+        ).also {
+            it.get().group = "atlas gradle"
+        }
+
+        project.tasks.register(
+            "runServer",
+            JavaExec::class.java,
+        ) {
+            it.group = "atlas gradle"
+            it.dependsOn(downloadServer)
+
+            it.mainClass.set("enterprises.stardust.atlas.dev.Entrypoint")
+            it.classpath += files(
+                runtimeJar,
+                downloadServer.get().target,
+                configurations.getByName(JavaPlugin.COMPILE_CLASSPATH_CONFIGURATION_NAME),
+                configurations.getByName(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME),
+            )
+            it.jvmArgs = listOf<String>()
+            it.args = listOf<String>()
+        }
     }
 
-    private fun fetchVersionManifest(path: Path): VersionManifest {
-        var fetched = false
-        val manifest = path.takeIf { Files.exists(it) }?.let {
-            VersionManifest.parse(it.readText())
-        } ?: run {
-            fetched = true
-            VersionManifest.fetch()
-        }
+    @Suppress("DEPRECATION")
+    private fun fetchVersionManifest(): VersionManifest {
+        val filePath = AtlasCache.cacheDir.resolve("version_metadata_v2.json")
+        val skipDownload = filePath.exists()
 
-        // if freshly fetched, just return it
-        if (fetched) {
+        try {
+            val manifest = VersionManifest.fetch()
             Files.write(
-                path,
+                filePath,
                 objectMapper.writeValueAsString(manifest).toByteArray(),
                 StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING,
             )
-            return manifest
-        }
-
-        // check if current is latest
-        try {
-            val freshManifest = VersionManifest.fetch()
-            Files.write(
-                path,
-                objectMapper.writeValueAsString(freshManifest).toByteArray(),
-                StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING,
-            )
-            return freshManifest
-        } catch (exception: IOException) {
-            System.err.println("Failed to fetch latest version manifest, using cached version.")
-            if (System.getProperty("atlas.gradle.debug", "false").toBoolean()) {
-                exception.printStackTrace()
+        } catch (throwable: Throwable) {
+            if (skipDownload) {
+                throwable.printStackTrace()
+                println("Failed to fetch version manifest, using cached version")
+            } else {
+                throw throwable
             }
         }
-        return manifest
+
+        return VersionManifest.from(filePath.readText())
     }
 
     companion object {
@@ -274,6 +303,9 @@ open class AtlasPlugin : StargradPlugin() {
         internal const val ATLAS_RUNTIME_CONFIGURATION = "atlasRuntime"
         internal const val REMAPPED_CONFIGURATION = "atlasInternalRemapped"
 
-        internal const val ATLAS_ANNOTATIONS = "com.github.atlas-fw:annotations:a63069a7b4"
+        internal const val ATLAS_ANNOTATIONS =
+            "com.github.atlas-fw:annotations:a63069a7b4"
+        internal const val ATLAS_LOADER =
+            "com.github.atlas-fw:loader:1.0.0-alpha.1"
     }
 }

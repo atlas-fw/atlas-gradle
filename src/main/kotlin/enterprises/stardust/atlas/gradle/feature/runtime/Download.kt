@@ -19,38 +19,59 @@ package enterprises.stardust.atlas.gradle.feature.runtime
 
 import enterprises.stardust.atlas.gradle.AtlasCache
 import enterprises.stardust.stargrad.task.StargradTask
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.OutputFile
 import org.gradle.internal.hash.Hashing
 import java.net.URL
 import java.nio.file.Path
+import javax.inject.Inject
 import kotlin.io.path.exists
 import kotlin.io.path.name
 import kotlin.io.path.readBytes
 import kotlin.io.path.readText
 
-open class Download(
+abstract class Download @Inject constructor(
+    @get:Input
+    val dependencyId: String,
+    @get:Input
     val url: URL,
-    val target: Path,
-    val hash: String,
+    @get:Input
+    val expectedHash: String,
+    @get:Input
+    val currentHash: String,
 ) : StargradTask() {
+    @get:OutputFile
+    abstract val target: Property<Path>
+
+    @get:OutputFile
+    abstract val hashFile: Property<Path>
+
+    init {
+        val (parent, fileName) = AtlasCache.resolveDependencyPath(dependencyId)
+        target.set(parent.resolve(fileName))
+        hashFile.set(parent.resolve("$fileName.hash"))
+    }
+
     override fun run() {
-        val hashFile = target.parent.resolve(target.name + ".hash")
-        if (hashFile.exists()) {
-            val hash = hashFile.readText()
-            if (hash == this.hash) {
+        if (hashFile.get().exists()) {
+            val hash = hashFile.get().readText()
+            if (hash == this.expectedHash) {
                 return
             }
         }
-        if (target.exists()) {
+        if (target.get().exists()) {
             val currentHash =
-                Hashing.sha1().hashBytes(target.readBytes()).toString()
-            if (currentHash == hash) {
+                Hashing.sha1().hashBytes(target.get().readBytes()).toString()
+            if (currentHash == expectedHash) {
                 return
             }
         }
+
         AtlasCache.cacheFile(
-            target.parent,
-            target.name,
+            target.get().parent,
+            target.get().name,
             url,
-        ) { hash }
+        ) { currentHash }
     }
 }

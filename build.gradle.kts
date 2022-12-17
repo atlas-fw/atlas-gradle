@@ -65,6 +65,7 @@ dependencies {
         compileOnly(gradleApi())
 
         include(project(":dev-runtime"))
+        include(project(":mc-metadata"))
 
         kotlinModules.forEach {
             implementation("org.jetbrains.kotlin", "kotlin-$it", KOTLIN)
@@ -339,6 +340,16 @@ publishing.publications {
         signing {
             isRequired = project.properties["signing.keyId"] != null
             sign(this@create)
+        }
+    }
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/${Coordinates.REPO_ID}")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
+            }
         }
     }
 }

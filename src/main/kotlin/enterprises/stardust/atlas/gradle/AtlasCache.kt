@@ -57,15 +57,9 @@ object AtlasCache {
                 "Invalid dependency: $dependencyNotation"
             )
         }
-        return cacheDependency(
-            data[0],
-            data[1],
-            data[2],
-            data.getOrNull(3),
-            data.getOrNull(4) ?: "jar",
-            url,
-            hashProvider
-        )
+        val (folder, artifactFileName) =
+            resolveDependencyPath(dependencyNotation)
+        return cacheFile(folder, artifactFileName, url, hashProvider)
     }
 
     fun cacheDependency(
@@ -78,7 +72,7 @@ object AtlasCache {
         hashProvider: (Path) -> String,
     ): Path {
         val (folder, artifactFileName) =
-            buildPath(group, name, version, classifier, extension)
+            resolveDependencyPath(group, name, version, classifier, extension)
         return cacheFile(folder, artifactFileName, url, hashProvider)
     }
 
@@ -141,7 +135,25 @@ object AtlasCache {
         url.openStream().use { Files.copy(it, this) }
     }
 
-    private fun buildPath(
+    fun resolveDependencyPath(
+        dependencyNotation: String,
+    ): Pair<Path, String> {
+        val data = dependencyNotation.split(":")
+        if (data.size < 3 || data.size > 5) {
+            throw IllegalArgumentException(
+                "Invalid dependency: $dependencyNotation"
+            )
+        }
+        return resolveDependencyPath(
+            data[0],
+            data[1],
+            data[2],
+            data.getOrNull(3),
+            data.getOrNull(4) ?: "jar"
+        )
+    }
+
+    fun resolveDependencyPath(
         group: String,
         name: String,
         version: String,
