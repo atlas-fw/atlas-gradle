@@ -20,9 +20,10 @@ package enterprises.stardust.atlas.gradle.feature.runtime
 import enterprises.stardust.stargrad.task.Task
 import org.gradle.api.tasks.JavaExec
 
-@Task("runClient", group = "atlas gradle")
-open class RunClient : JavaExec() {
+open class Run : JavaExec() {
     init {
+        dependsOn("downloadClient")
+
         group = "atlas gradle"
         mainClass.set("enterprises.stardust.atlas.dev.runtime.RuntimeLauncher")
         classpath = project.configurations.getByName("runtime")

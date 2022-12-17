@@ -15,7 +15,7 @@
  * along with atlas-gradle.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package enterprises.stardust.atlas.gradle.cache
+package enterprises.stardust.atlas.gradle
 
 import org.gradle.api.Project
 import java.io.File
@@ -23,6 +23,7 @@ import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
+import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
@@ -41,22 +42,22 @@ object AtlasCache {
     val cacheDir: Path by lazy {
         project.gradle.gradleUserHomeDir.resolve("caches")
             .resolve("atlas-gradle")
-            .also { it.mkdirs() }
             .toPath()
+            .also { it.createDirectories() }
     }
 
     fun cacheDependency(
         dependencyNotation: String,
         url: URL,
-        hashProvider: (Path) -> String
-    ) {
+        hashProvider: (Path) -> String,
+    ): Path {
         val data = dependencyNotation.split(":")
         if (data.size < 3 || data.size > 5) {
             throw IllegalArgumentException(
                 "Invalid dependency: $dependencyNotation"
             )
         }
-        cacheDependency(
+        return cacheDependency(
             data[0],
             data[1],
             data[2],
@@ -75,10 +76,10 @@ object AtlasCache {
         extension: String = "jar",
         url: URL,
         hashProvider: (Path) -> String,
-    ) {
+    ): Path {
         val (folder, artifactFileName) =
             buildPath(group, name, version, classifier, extension)
-        cacheFile(folder, artifactFileName, url, hashProvider)
+        return cacheFile(folder, artifactFileName, url, hashProvider)
     }
 
     /**
@@ -99,7 +100,7 @@ object AtlasCache {
         storePath: Path,
         fileName: String,
         url: URL,
-        hashProvider: (Path) -> String
+        hashProvider: (Path) -> String,
     ): Path {
         val hashFile = storePath.resolve("$fileName.hash")
         val file = storePath.resolve(fileName)
@@ -134,7 +135,7 @@ object AtlasCache {
      */
     fun downloadURL(
         url: URL,
-        path: Path
+        path: Path,
     ): Path = path.apply {
         parent.toFile().mkdirs()
         url.openStream().use { Files.copy(it, this) }
@@ -153,9 +154,6 @@ object AtlasCache {
         val artifactName = "$name-$version" +
             classifier?.let { "-$it" }.orEmpty() +
             ".$extension"
-        return Pair(
-            folder,
-            artifactName
-        )
+        return folder to artifactName
     }
 }

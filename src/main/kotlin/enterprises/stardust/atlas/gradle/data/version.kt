@@ -19,7 +19,7 @@ package enterprises.stardust.atlas.gradle.data
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.google.common.hash.Hashing
-import enterprises.stardust.atlas.gradle.cache.AtlasCache
+import enterprises.stardust.atlas.gradle.AtlasCache
 import enterprises.stardust.atlas.gradle.objectMapper
 import java.net.URL
 import java.util.*
@@ -36,14 +36,14 @@ import kotlin.io.path.readText
  */
 data class VersionJson(
     val arguments: Arguments?,
-    val assetIndex: AssetIndex,
+    val assetIndex: Artifact,
     val assets: String,
     val complianceLevel: Int,
     val downloads: Downloads,
     val id: String,
     val javaVersion: JavaVersion,
-//    val libraries: List<Library>,
     val libraries: List<Library>,
+    val logging: Logging?,
     val mainClass: String,
     val minecraftArguments: String?,
     val minimumLauncherVersion: Int,
@@ -96,30 +96,26 @@ data class VersionJson(
 }
 
 data class Arguments(
+    // todo
     val game: List<*>,
     val jvm: List<*>
 )
 
-data class AssetIndex(
-    val id: String,
+data class Artifact(
+    val id: String?,
+    val path: String?,
     val sha1: String,
+    val totalSize: Long?,
     val size: Long,
-    val totalSize: Long,
     val url: URL,
 )
 
 data class Downloads(
-    val client: DownloadInfo,
-    @JsonProperty("client_mappings") val clientMappings: DownloadInfo?,
-    val server: DownloadInfo?,
-    @JsonProperty("server_mappings") val serverMappings: DownloadInfo?,
-    @JsonProperty("windows_server") val windowsServer: DownloadInfo?,
-)
-
-data class DownloadInfo(
-    val sha1: String,
-    val size: Long,
-    val url: URL,
+    val client: Artifact,
+    @JsonProperty("client_mappings") val clientMappings: Artifact?,
+    val server: Artifact?,
+    @JsonProperty("server_mappings") val serverMappings: Artifact?,
+    @JsonProperty("windows_server") val windowsServer: Artifact?,
 )
 
 data class JavaVersion(
@@ -132,32 +128,43 @@ data class Library(
     val name: String,
     val natives: Map<String, String>?,
     val rules: List<Rule>?,
-    val extract: LibraryExtract?,
+    val extract: Extract?,
 )
 
 data class LibraryDownloads(
-    val artifact: LibraryArtifact?,
-    val classifiers: Map<String, LibraryArtifact>?,
-)
-
-data class LibraryArtifact(
-    val path: String,
-    val sha1: String,
-    val size: Long,
-    val url: URL,
+    val artifact: Artifact?,
+    val classifiers: Map<String, Artifact>?,
 )
 
 data class Rule(
     val action: RuleAction,
     val features: Map<String, Boolean>?,
-    val os: String,
+    val os: OSInfo?,
+)
+
+data class OSInfo(
+    val arch: String?,
+    val name: String?,
+    val version: String?,
 )
 
 enum class RuleAction {
+    @JsonProperty("allow")
     ALLOW,
+    @JsonProperty("disallow")
     DISALLOW,
 }
 
-data class LibraryExtract(
+data class Extract(
     val exclude: List<String>,
+)
+
+data class Logging(
+    val client: LoggingInfo,
+)
+
+data class LoggingInfo(
+    val argument: String,
+    val file: Artifact,
+    val type: String,
 )

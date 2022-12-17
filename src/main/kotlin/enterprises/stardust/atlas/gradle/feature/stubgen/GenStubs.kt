@@ -42,11 +42,11 @@ open class GenStubs : StargradTask() {
     internal fun init() {
         val sourceMappingJars = mutableListOf<File>()
         with(project) {
-            val mappingsJar = tasks.findByName(AtlasPlugin.MAPPING_SOURCESET + "Jar") as? AbstractArchiveTask
+            val mappingsJar = tasks.findByName(AtlasPlugin.FACADES_SOURCESET + "Jar") as? AbstractArchiveTask
             mappingsJar?.archiveFile?.orNull?.asFile
                 ?.also(sourceMappingJars::add)
 
-            val config = project.configurations.getByName(AtlasPlugin.MAPPING_CONFIGURATION)
+            val config = project.configurations.getByName(AtlasPlugin.FACADE_CONFIGURATION)
             config.resolve().forEach(sourceMappingJars::add)
         }
         this.sourceJars = project.files(*sourceMappingJars.toTypedArray())

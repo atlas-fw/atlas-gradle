@@ -19,10 +19,10 @@ package enterprises.stardust.atlas.gradle
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import enterprises.stardust.atlas.gradle.cache.AtlasCache
 import enterprises.stardust.atlas.gradle.data.VersionJson
 import enterprises.stardust.atlas.gradle.data.VersionManifest
 import enterprises.stardust.atlas.gradle.feature.remap.RemapJar
+import enterprises.stardust.atlas.gradle.feature.runtime.Download
 import enterprises.stardust.atlas.gradle.feature.stubgen.GenStubs
 import enterprises.stardust.stargrad.StargradPlugin
 import org.gradle.api.artifacts.Dependency
@@ -53,6 +53,9 @@ open class AtlasPlugin : StargradPlugin() {
     internal lateinit var atlasExtension: AtlasExtension
     internal lateinit var versionManifest: VersionManifest
 
+    private lateinit var downloadClient: Download
+    private lateinit var downloadServer: Download
+
     override fun applyPlugin() {
         with(project) {
             AtlasCache.project = this
@@ -81,41 +84,49 @@ open class AtlasPlugin : StargradPlugin() {
             registerTask<RemapJar>().also {
                 tasks.getByName("assemble").dependsOn(it)
             }
+
+            downloadClient = tasks.create("downloadClient", Download::class.java)
+
             val genStubs = registerTask<GenStubs>()
-
             configurations {
-                fun createAndExtend(name: String, extendsFrom: String) = maybeCreate(name).also {
-                    getByName(extendsFrom).extendsFrom(it)
-                }
+                fun createAndExtend(name: String, extendsFrom: String) =
+                    maybeCreate(name).also {
+                        getByName(extendsFrom).extendsFrom(it)
+                    }
 
-                createAndExtend(LOADER_CONFIGURATION, JavaPlugin.IMPLEMENTATION_CONFIGURATION_NAME)
-                createAndExtend(MAPPING_CONFIGURATION, JavaPlugin.API_CONFIGURATION_NAME)
-                createAndExtend(REMAPPED_CONFIGURATION, JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME)
-                createAndExtend(RUNTIME_CONFIGURATION, JavaPlugin.RUNTIME_ONLY_CONFIGURATION_NAME)
+                createAndExtend(
+                    FACADE_CONFIGURATION,
+                    JavaPlugin.API_CONFIGURATION_NAME
+                )
+                createAndExtend(
+                    REMAPPED_CONFIGURATION,
+                    JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME
+                )
+                maybeCreate(ATLAS_RUNTIME_CONFIGURATION)
             }
 
             extensions.findByType(JavaPluginExtension::class.java)!!.sourceSets {
-                val mappingSet = create(MAPPING_SOURCESET)
+                val facadesSet = create(FACADES_SOURCESET)
 
                 // This is pretty shit since it's also adding the
                 // kotlin runtime to the classpath of the mappings set.
                 // This is unfortunately unavoidable to prevent annoying
                 // compiler warnings about missing annotations constants.
                 dependencies.add(
-                    mappingSet.compileOnlyConfigurationName, ATLAS_ANNOTATIONS
+                    facadesSet.compileOnlyConfigurationName, ATLAS_ANNOTATIONS
                 )
 
                 (tasks.findByName(JavaPlugin.JAR_TASK_NAME) as Jar).apply {
-                    from(mappingSet.output)
+                    from(facadesSet.output)
                 }
 
-                filter { it.name != MAPPING_SOURCESET }.forEach {
+                filter { it.name != FACADES_SOURCESET }.forEach {
                     tasks.getByName(it.compileJavaTaskName).dependsOn(genStubs)
                 }
 
-                tasks.create(mappingSet.jarTaskName, Jar::class.java) {
-                    it.from(mappingSet.output)
-                    it.archiveClassifier.set(mappingSet.name)
+                tasks.create(facadesSet.jarTaskName, Jar::class.java) {
+                    it.from(facadesSet.output)
+                    it.archiveClassifier.set(facadesSet.name)
                     // Let's hope this isn't a terrible idea down the line
                     it.duplicatesStrategy = DuplicatesStrategy.INCLUDE
                 }.also {
@@ -130,7 +141,7 @@ open class AtlasPlugin : StargradPlugin() {
     }
 
     override fun afterEvaluate() {
-        val runtime = project.configurations.getByName(RUNTIME_CONFIGURATION)
+        val runtime = project.configurations.getByName(ATLAS_RUNTIME_CONFIGURATION)
 
         if (runtime.dependencies.any { it.group != MOJANG_GROUP && it.name == MINECRAFT_ID }) {
             throw IllegalStateException(
@@ -157,8 +168,8 @@ open class AtlasPlugin : StargradPlugin() {
 
     private fun handleMinecraftRuntime(
         minecraftRuntime: Dependency,
-    ) = with(project.logger) {
-        info("Found Minecraft runtime: $minecraftRuntime")
+    ) = with(project) {
+        println("Found Minecraft runtime: $minecraftRuntime")
 
         //download appropriate runtime
         val versionMeta = versionManifest.versions.firstOrNull {
@@ -166,30 +177,43 @@ open class AtlasPlugin : StargradPlugin() {
         } ?: throw (IllegalStateException(
             "Could not find Minecraft version ${minecraftRuntime.version}"
         ).also {
-            error(it.message, it)
+            logger.error(it.message, it)
         })
 
         val versionJson = VersionJson.fetch(versionMeta.url)
         val client = versionJson.downloads.client
         val server = versionJson.downloads.server
         if (server == null) {
-            warn("Server download not available for $minecraftRuntime")
+            logger.warn("Server download not available for $minecraftRuntime")
         }
 
-        info("Downloading Minecraft client JAR")
+        print("Downloading Minecraft client JAR...")
+        System.out.flush()
         val clientJar = AtlasCache.cacheDependency(
             minecraftRuntime.group!!,
             minecraftRuntime.name,
             minecraftRuntime.version!!,
+            classifier = "client",
             url = client.url,
         ) { client.sha1 }
-        info("Done")
+        println(" Done")
 
+        if (server != null) {
+            print("Downloading Minecraft server JAR...")
+            System.out.flush()
+            val serverJar = AtlasCache.cacheDependency(
+                minecraftRuntime.group!!,
+                minecraftRuntime.name,
+                minecraftRuntime.version!!,
+                classifier = "server",
+                url = server.url,
+            ) { server.sha1 }
+            println(" Done")
+        }
 
         //download libraries
         // -> download proper natives
-        //add local repo to project
-        //add runtime to local repo
+
     }
 
     private fun fetchVersionManifest(path: Path): VersionManifest {
@@ -234,11 +258,7 @@ open class AtlasPlugin : StargradPlugin() {
     companion object {
         private val PROPAGANDA = """
             ╭──( Atlas Gradle Plugin )──•
-            │ ▶ Minecraft information:
-            │ Latest version: %s
-            │ Latest snapshot: %s
-            │
-            │ ▶ Atlas information:
+            │ ▶ Information:
             │ Atlas is currently in alpha, and as such, the API is
             │ subject to change. If you're interested in contributing,
             │ please visit https://stardust.enterprises/discord
@@ -248,11 +268,10 @@ open class AtlasPlugin : StargradPlugin() {
         internal const val MOJANG_GROUP = "com.mojang"
         internal const val MINECRAFT_ID = "minecraft"
 
-        internal const val MAPPING_SOURCESET = "mappings"
+        internal const val FACADES_SOURCESET = "facades"
 
-        internal const val LOADER_CONFIGURATION = "loader"
-        internal const val MAPPING_CONFIGURATION = "mapping"
-        internal const val RUNTIME_CONFIGURATION = "atlasRuntime"
+        internal const val FACADE_CONFIGURATION = "facade"
+        internal const val ATLAS_RUNTIME_CONFIGURATION = "atlasRuntime"
         internal const val REMAPPED_CONFIGURATION = "atlasInternalRemapped"
 
         internal const val ATLAS_ANNOTATIONS = "com.github.atlas-fw:annotations:a63069a7b4"
