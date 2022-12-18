@@ -56,7 +56,10 @@ abstract class Download @Inject constructor(
     @Suppress("DEPRECATION")
     override fun run() {
         if (hashFile.get().exists() &&
-            hashFile.get().readText() == this.expectedHash) return
+            hashFile.get().readText() == this.expectedHash
+        ) {
+            return
+        }
 
         target.get().also {
             if (it.exists()) {
