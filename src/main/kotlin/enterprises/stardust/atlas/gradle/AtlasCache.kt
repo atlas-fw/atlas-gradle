@@ -23,10 +23,7 @@ import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
-import kotlin.io.path.createDirectories
-import kotlin.io.path.exists
-import kotlin.io.path.readText
-import kotlin.io.path.writeText
+import kotlin.io.path.*
 import kotlin.properties.Delegates
 
 /**
@@ -107,6 +104,8 @@ object AtlasCache {
                 return file
             }
         }
+
+        file.deleteIfExists()
 
         downloadURL(url, file)
         hashFile.writeText(
