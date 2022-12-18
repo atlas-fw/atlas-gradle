@@ -28,6 +28,7 @@ import enterprises.stardust.atlas.gradle.metadata.VersionManifest
 import enterprises.stardust.atlas.gradle.metadata.fetch
 import enterprises.stardust.atlas.gradle.metadata.from
 import enterprises.stardust.stargrad.StargradPlugin
+import org.gradle.api.Project
 import org.gradle.api.artifacts.Dependency
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.plugins.JavaLibraryPlugin
@@ -168,7 +169,7 @@ open class AtlasPlugin : StargradPlugin() {
 
     private fun handleMinecraftRuntime(
         dep: Dependency,
-    ) = with(project) {
+    ): Unit = with(project) {
         println("Found Minecraft runtime: ${dep.group}:${dep.name}:${dep.version}")
 
         // download appropriate runtime
@@ -181,85 +182,66 @@ open class AtlasPlugin : StargradPlugin() {
         }
         val versionJson = VersionJson.fetch(versionMeta.url)
 
-        val clientHash = AtlasCache.resolveDependencyPath(
-            dep.group + ":" + dep.name + ":" + dep.version + ":client",
-        ).let { (parent, name) ->
-            val file = parent.resolve(name)
-            if (file.exists())
-                Hashing.sha1().hashBytes(file.readBytes()).toString()
-            else
-                null
-        } ?: UUID.randomUUID().toString()
-
-        val downloadClient = project.tasks.register(
-            "downloadClient",
-            Download::class.java,
-            dep.group + ":" + dep.name + ":" + dep.version + ":client",
-            versionJson.downloads.client.url,
-            versionJson.downloads.client.sha1,
-            clientHash,
-        ).also {
-            it.get().group = "atlas gradle"
-        }
-
-        project.tasks.register(
-            "runClient",
-            JavaExec::class.java,
-        ) {
-            it.group = "atlas gradle"
-            it.dependsOn(downloadClient)
-
-            it.mainClass.set("enterprises.stardust.atlas.dev.Entrypoint")
-            it.classpath += files(
-                runtimeJar,
-                downloadClient.get().target,
-                configurations.getByName(JavaPlugin.COMPILE_CLASSPATH_CONFIGURATION_NAME),
-                configurations.getByName(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME),
-            )
-            it.jvmArgs = listOf<String>()
-            it.args = listOf<String>()
-        }
+        setupMinecraft(this, dep, versionJson, "client")
 
         if (versionJson.downloads.server == null) return@with
+        setupMinecraft(this, dep, versionJson, "server")
+    }
 
-        val serverHash = AtlasCache.resolveDependencyPath(
-            dep.group + ":" + dep.name + ":" + dep.version + ":server",
-        ).let { (parent, name) ->
-            val file = parent.resolve(name)
-            if (file.exists())
-                Hashing.sha1().hashBytes(file.readBytes()).toString()
-            else
-                null
-        } ?: UUID.randomUUID().toString()
-
-        val downloadServer = project.tasks.register(
-            "downloadServer",
-            Download::class.java,
-            dep.group + ":" + dep.name + ":" + dep.version + ":server",
-            versionJson.downloads.server!!.url,
-            versionJson.downloads.server!!.sha1,
-            serverHash,
-        ).also {
-            it.get().group = "atlas gradle"
+    @Suppress("DEPRECATED")
+    private fun setupMinecraft(
+        project: Project,
+        dep: Dependency,
+        versionJson: VersionJson,
+        side: String,
+    ) = with(project) {
+        val notation = "${dep.group}:${dep.name}:${dep.version}:$side"
+        val taskSuffix = side.replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase(Locale.getDefault())
+            else it.toString()
         }
+        val hash = AtlasCache.resolveDependencyPath(notation)
+            .let { (parent, name) ->
+                parent.resolve(name).run {
+                    if (exists()) Hashing.sha1().hashBytes(readBytes())
+                    else UUID.randomUUID()
+                }.toString()
+            }
 
-        project.tasks.register(
-            "runServer",
+        val artifact =
+            if (side == "client") versionJson.downloads.client
+            else versionJson.downloads.server!!
+
+        val downloadTask = tasks.create(
+            "download$taskSuffix",
+            Download::class.java,
+            notation,
+            artifact.url,
+            artifact.sha1,
+            hash,
+        ).also { it.group = TASK_GROUP }
+
+        tasks.create(
+            "run$taskSuffix",
             JavaExec::class.java,
-        ) {
-            it.group = "atlas gradle"
-            it.dependsOn(downloadServer)
+        ) { exec ->
+            exec.group = TASK_GROUP
+            exec.dependsOn(downloadTask)
 
-            it.mainClass.set("enterprises.stardust.atlas.dev.Entrypoint")
-            it.classpath += files(
+            exec.mainClass.set("enterprises.stardust.atlas.dev.Entrypoint")
+            exec.workingDir = projectDir.resolve("run/$side")
+                .also { workingDir -> exec.doFirst { workingDir.mkdirs() } }
+            exec.classpath += files(
                 runtimeJar,
-                downloadServer.get().target,
+                downloadTask.target,
                 configurations.getByName(JavaPlugin.COMPILE_CLASSPATH_CONFIGURATION_NAME),
                 configurations.getByName(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME),
             )
-            it.jvmArgs = listOf<String>()
-            it.args = listOf<String>()
+            exec.jvmArgs = listOf<String>()
+            exec.args = listOf<String>()
         }
+
+        Unit
     }
 
     private fun fetchVersionManifest(): VersionManifest {
@@ -288,13 +270,15 @@ open class AtlasPlugin : StargradPlugin() {
 
     companion object {
         private val PROPAGANDA = """
-            ╭──( Atlas Gradle Plugin )──•
-            │ ▶ Information:
-            │ Atlas is currently in alpha, and as such, the API is
-            │ subject to change. If you're interested in contributing,
-            │ please visit https://stardust.enterprises/discord
-            ╰───────────────────────────•
+            /--( Atlas Gradle Plugin )--o
+            | > Information:
+            | Atlas is currently in alpha, and as such, the API is
+            | subject to change. If you're interested in contributing,
+            | please visit https://stardust.enterprises/discord
+            \---------------------------o
         """.trimIndent()
+
+        internal const val TASK_GROUP = "atlas framework"
 
         internal const val MOJANG_GROUP = "com.mojang"
         internal const val MINECRAFT_ID = "minecraft"

@@ -18,6 +18,7 @@
 package enterprises.stardust.atlas.gradle.feature.stubgen
 
 import enterprises.stardust.atlas.gradle.AtlasPlugin
+import enterprises.stardust.atlas.gradle.AtlasPlugin.Companion.TASK_GROUP
 import enterprises.stardust.stargrad.task.StargradTask
 import enterprises.stardust.stargrad.task.Task
 import org.gradle.api.file.FileCollection
@@ -27,7 +28,7 @@ import org.gradle.api.tasks.bundling.AbstractArchiveTask
 import java.io.File
 import java.util.zip.ZipFile
 
-@Task("genStubs", group = "atlas gradle")
+@Task("genStubs", group = TASK_GROUP)
 open class GenStubs : StargradTask() {
     // TODO: change input to mapping metadata declarations directly
     //  since a mapping jar can have no mapping classes and would trigger

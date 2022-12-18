@@ -40,13 +40,13 @@ public class Entrypoint {
             }
         }
 
-        System.out.println("Calling net.minecraft.client.main.Main");
-        System.out.println("--------------------------------------");
+        String mainClassName = "net.minecraft.server.MinecraftServer"; /*"net.minecraft.client.main.Main"*/
+        System.out.println("Calling " + mainClassName);
+        System.out.println("-----------------------------------");
         try {
-            Class<?> mainClass = Class.forName("net.minecraft.client.main.Main");
+            Class<?> mainClass = Class.forName(mainClassName);
             Method mainMethod = mainClass.getMethod("main", String[].class);
-            mainMethod.setAccessible(true);
-            mainMethod.invoke(null, (Object[]) args);
+            mainMethod.invoke(null, (Object) args);
         } catch (ReflectiveOperationException reflectiveOperationException) {
             reflectiveOperationException.printStackTrace();
         }

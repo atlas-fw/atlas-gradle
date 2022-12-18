@@ -17,11 +17,12 @@
 
 package enterprises.stardust.atlas.gradle.feature.remap
 
+import enterprises.stardust.atlas.gradle.AtlasPlugin.Companion.TASK_GROUP
 import enterprises.stardust.stargrad.task.StargradTask
 import enterprises.stardust.stargrad.task.Task
 import org.gradle.api.tasks.bundling.AbstractArchiveTask
 
-@Task("remap", group = "atlas gradle")
+@Task("remap", group = TASK_GROUP)
 open class RemapJar : StargradTask() {
     internal fun targets(task: AbstractArchiveTask) =
         dependsOn(task)
