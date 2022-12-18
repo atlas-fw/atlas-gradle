@@ -19,8 +19,10 @@ package enterprises.stardust.atlas.gradle
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.google.common.hash.Hashing
 import enterprises.stardust.atlas.gradle.feature.remap.RemapJar
 import enterprises.stardust.atlas.gradle.feature.runtime.Download
+import enterprises.stardust.atlas.gradle.feature.runtime.DownloadClientLibs
 import enterprises.stardust.atlas.gradle.feature.runtime.runtimeJar
 import enterprises.stardust.atlas.gradle.feature.stubgen.GenStubs
 import enterprises.stardust.atlas.gradle.metadata.VersionJson
@@ -35,7 +37,6 @@ import org.gradle.api.plugins.JavaLibraryPlugin
 import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.tasks.JavaExec
-import org.gradle.internal.hash.Hashing
 import org.gradle.jvm.tasks.Jar
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
@@ -188,7 +189,7 @@ open class AtlasPlugin : StargradPlugin() {
         setupMinecraft(this, dep, versionJson, "server")
     }
 
-    @Suppress("DEPRECATED")
+    @Suppress("DEPRECATION")
     private fun setupMinecraft(
         project: Project,
         dep: Dependency,
@@ -221,12 +222,22 @@ open class AtlasPlugin : StargradPlugin() {
             hash,
         ).also { it.group = TASK_GROUP }
 
+        val downloadLibsTask =
+            if (side == "client")
+                tasks.create(
+                    DOWNLOAD_CLIENT_LIBS_TASK,
+                    DownloadClientLibs::class.java,
+                    versionJson.libraries,
+                ).also { it.group = TASK_GROUP }
+            else null
+
         tasks.create(
             "run$taskSuffix",
             JavaExec::class.java,
         ) { exec ->
             exec.group = TASK_GROUP
             exec.dependsOn(downloadTask)
+            downloadLibsTask?.let { exec.dependsOn(it) }
 
             exec.mainClass.set("enterprises.stardust.atlas.dev.Entrypoint")
             exec.workingDir = projectDir.resolve("run/$side")
@@ -279,6 +290,7 @@ open class AtlasPlugin : StargradPlugin() {
         """.trimIndent()
 
         internal const val TASK_GROUP = "atlas framework"
+        internal const val DOWNLOAD_CLIENT_LIBS_TASK = "downloadClientLibs"
 
         internal const val MOJANG_GROUP = "com.mojang"
         internal const val MINECRAFT_ID = "minecraft"

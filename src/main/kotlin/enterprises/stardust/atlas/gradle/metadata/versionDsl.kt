@@ -17,9 +17,9 @@
 
 package enterprises.stardust.atlas.gradle.metadata
 
+import com.google.common.hash.Hashing
 import enterprises.stardust.atlas.gradle.AtlasCache
 import enterprises.stardust.atlas.gradle.objectMapper
-import org.gradle.internal.hash.Hashing
 import java.net.URL
 import java.util.*
 import kotlin.io.path.createDirectories

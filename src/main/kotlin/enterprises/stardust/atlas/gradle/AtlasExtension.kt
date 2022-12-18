@@ -17,12 +17,12 @@
 
 package enterprises.stardust.atlas.gradle
 
+import com.google.common.hash.Hashing
 import enterprises.stardust.atlas.gradle.feature.runtime.RuntimeConfiguration
 import enterprises.stardust.atlas.gradle.feature.stubgen.StubConfiguration
 import enterprises.stardust.stargrad.ext.Extension
 import enterprises.stardust.stargrad.ext.StargradExtension
 import org.gradle.api.Project
-import org.gradle.internal.hash.Hashing
 import kotlin.random.Random
 
 @Extension("atlas")
@@ -39,6 +39,7 @@ open class AtlasExtension(
     fun stub(block: StubConfiguration.() -> Unit) =
         stub.block()
 
+    @Suppress("DEPRECATION")
     fun api(vararg modules: String): String {
         val version = "local-" + Hashing.md5().hashBytes(Random.nextBytes(256))
         return "me.xtrm.atlas:api:$version"

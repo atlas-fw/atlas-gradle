@@ -17,12 +17,12 @@
 
 package enterprises.stardust.atlas.gradle.feature.runtime
 
+import com.google.common.hash.Hashing
 import enterprises.stardust.atlas.gradle.AtlasCache
 import enterprises.stardust.stargrad.task.StargradTask
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.OutputFile
-import org.gradle.internal.hash.Hashing
 import java.net.URL
 import java.nio.file.Path
 import javax.inject.Inject
@@ -53,25 +53,18 @@ abstract class Download @Inject constructor(
         hashFile.set(parent.resolve("$fileName.hash"))
     }
 
+    @Suppress("DEPRECATION")
     override fun run() {
-        if (hashFile.get().exists()) {
-            val hash = hashFile.get().readText()
-            if (hash == this.expectedHash) {
-                return
-            }
-        }
-        if (target.get().exists()) {
-            val currentHash =
-                Hashing.sha1().hashBytes(target.get().readBytes()).toString()
-            if (currentHash == expectedHash) {
-                return
-            }
-        }
+        if (hashFile.get().exists() &&
+            hashFile.get().readText() == this.expectedHash) return
 
-        AtlasCache.cacheFile(
-            target.get().parent,
-            target.get().name,
-            url,
-        ) { currentHash }
+        target.get().also {
+            if (it.exists()) {
+                val hash = Hashing.sha1().hashBytes(it.readBytes()).toString()
+                if (hash == this.expectedHash) return
+            }
+
+            AtlasCache.cacheFile(it.parent, it.name, url) { currentHash }
+        }
     }
 }

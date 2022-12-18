@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import java.net.URL
 import java.util.*
 
+
 /**
  * A version json metadata.
  *
@@ -42,7 +43,7 @@ data class VersionJson(
     val minimumLauncherVersion: Int,
     val releaseTime: String,
     val time: String,
-    val type: String
+    val type: String,
 ) {
     val gameArguments: List<*>
         get() = arguments?.game ?: minecraftArguments!!.split(" ")
@@ -55,7 +56,7 @@ data class VersionJson(
 data class Arguments(
     // todo
     val game: List<*>,
-    val jvm: List<*>
+    val jvm: List<*>,
 )
 
 data class Artifact(
@@ -84,33 +85,14 @@ data class Library(
     val downloads: LibraryDownloads,
     val name: String,
     val natives: Map<String, String>?,
-    val rules: List<Rule>?,
+    override val rules: List<Rule> = emptyList(),
     val extract: Extract?,
-)
+) : Ruleable()
 
 data class LibraryDownloads(
     val artifact: Artifact?,
     val classifiers: Map<String, Artifact>?,
 )
-
-data class Rule(
-    val action: RuleAction,
-    val features: Map<String, Boolean>?,
-    val os: OSInfo?,
-)
-
-data class OSInfo(
-    val arch: String?,
-    val name: String?,
-    val version: String?,
-)
-
-enum class RuleAction {
-    @JsonProperty("allow")
-    ALLOW,
-    @JsonProperty("disallow")
-    DISALLOW,
-}
 
 data class Extract(
     val exclude: List<String>,
