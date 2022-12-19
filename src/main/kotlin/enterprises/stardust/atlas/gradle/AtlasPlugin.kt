@@ -22,13 +22,10 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.google.common.hash.Hashing
 import enterprises.stardust.atlas.gradle.feature.remap.RemapJar
 import enterprises.stardust.atlas.gradle.feature.runtime.Download
-import enterprises.stardust.atlas.gradle.feature.runtime.DownloadClientLibs
+import enterprises.stardust.atlas.gradle.feature.runtime.ExtractClientNatives
 import enterprises.stardust.atlas.gradle.feature.runtime.runtimeJar
 import enterprises.stardust.atlas.gradle.feature.stubgen.GenStubs
-import enterprises.stardust.atlas.gradle.metadata.VersionJson
-import enterprises.stardust.atlas.gradle.metadata.VersionManifest
-import enterprises.stardust.atlas.gradle.metadata.fetch
-import enterprises.stardust.atlas.gradle.metadata.from
+import enterprises.stardust.atlas.gradle.metadata.*
 import enterprises.stardust.stargrad.StargradPlugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Dependency
@@ -38,12 +35,11 @@ import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.tasks.JavaExec
 import org.gradle.jvm.tasks.Jar
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 import java.util.*
-import kotlin.io.path.exists
-import kotlin.io.path.readBytes
-import kotlin.io.path.readText
+import kotlin.io.path.*
 
 /**
  * Shared instance of Jackson's [ObjectMapper], configured with Kotlin adapters.
@@ -105,6 +101,8 @@ open class AtlasPlugin : StargradPlugin() {
                     JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME
                 )
                 maybeCreate(ATLAS_RUNTIME_CONFIGURATION)
+                maybeCreate(ATLAS_CLIENT_RUNTIME)
+                maybeCreate(ATLAS_SERVER_RUNTIME)
             }
 
             extensions.findByType(JavaPluginExtension::class.java)!!.sourceSets {
@@ -173,6 +171,12 @@ open class AtlasPlugin : StargradPlugin() {
     ): Unit = with(project) {
         println("Found Minecraft runtime: ${dep.group}:${dep.name}:${dep.version}")
 
+        repositories {
+            maven {
+                it.url = uri("https://libraries.minecraft.net")
+            }
+        }
+
         // download appropriate runtime
         val versionMeta = versionManifest.versions.firstOrNull {
             it.id == dep.version
@@ -183,10 +187,26 @@ open class AtlasPlugin : StargradPlugin() {
         }
         val versionJson = VersionJson.fetch(versionMeta.url)
 
+        addToDependencies(versionJson.libraries)
         setupMinecraft(this, dep, versionJson, "client")
 
         if (versionJson.downloads.server == null) return@with
         setupMinecraft(this, dep, versionJson, "server")
+    }
+
+    private fun Project.addToDependencies(
+        libraries: List<Library>,
+    ) {
+        val ctx = RuleContext.withCurrentPlatform()
+
+        libraries.filter { it.rulesApply(ctx) }.forEach { lib ->
+            val dep = dependencies.create(lib.name)
+            println(lib.name)
+            println(dep)
+            configurations.getByName(ATLAS_CLIENT_RUNTIME)
+                .dependencies
+                .add(dep)
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -195,7 +215,7 @@ open class AtlasPlugin : StargradPlugin() {
         dep: Dependency,
         versionJson: VersionJson,
         side: String,
-    ) = with(project) {
+    ): Unit = with(project) {
         val notation = "${dep.group}:${dep.name}:${dep.version}:$side"
         val taskSuffix = side.replaceFirstChar {
             if (it.isLowerCase()) it.titlecase(Locale.getDefault())
@@ -222,14 +242,14 @@ open class AtlasPlugin : StargradPlugin() {
             hash,
         ).also { it.group = TASK_GROUP }
 
-        val downloadLibsTask =
-            if (side == "client")
+        val extractNatives =
+            if (side == "client") {
                 tasks.create(
-                    DOWNLOAD_CLIENT_LIBS_TASK,
-                    DownloadClientLibs::class.java,
-                    versionJson.libraries,
+                    "extractNatives",
+                    ExtractClientNatives::class.java,
+                    versionJson.libraries.filter { it.natives != null },
                 ).also { it.group = TASK_GROUP }
-            else null
+            } else null
 
         tasks.create(
             "run$taskSuffix",
@@ -237,22 +257,42 @@ open class AtlasPlugin : StargradPlugin() {
         ) { exec ->
             exec.group = TASK_GROUP
             exec.dependsOn(downloadTask)
-            downloadLibsTask?.let { exec.dependsOn(it) }
+            extractNatives?.let { exec.dependsOn(it) }
 
             exec.mainClass.set("enterprises.stardust.atlas.dev.Entrypoint")
-            exec.workingDir = projectDir.resolve("run/$side")
-                .also { workingDir -> exec.doFirst { workingDir.mkdirs() } }
+            exec.workingDir = projectDir.resolve("run").toPath()
+                .also { runFolder ->
+                    exec.doFirst { _ ->
+                        runFolder.resolve(".gitignore").also {
+                            if (it.exists()) return@doFirst
+
+                            it.writeText(
+                                "# File generated by atlas-gradle, " +
+                                    "stop committing this.\n*\n!.gitignore",
+                                StandardCharsets.UTF_8,
+                                StandardOpenOption.CREATE,
+                                StandardOpenOption.TRUNCATE_EXISTING,
+                            )
+                        }
+                    }
+                }
+                .resolve(side)
+                .also { exec.doFirst { _ -> it.createDirectories() } }
+                .toFile()
             exec.classpath += files(
                 runtimeJar,
                 downloadTask.target,
-                configurations.getByName(JavaPlugin.COMPILE_CLASSPATH_CONFIGURATION_NAME),
-                configurations.getByName(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME),
+                configurations.getByName("${side}RuntimeOnly"),
+                configurations.getByName(
+                    JavaPlugin.COMPILE_CLASSPATH_CONFIGURATION_NAME
+                ),
+                configurations.getByName(
+                    JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME
+                ),
             )
             exec.jvmArgs = listOf<String>()
             exec.args = listOf<String>()
         }
-
-        Unit
     }
 
     private fun fetchVersionManifest(): VersionManifest {
@@ -300,6 +340,9 @@ open class AtlasPlugin : StargradPlugin() {
         internal const val FACADE_CONFIGURATION = "facade"
         internal const val ATLAS_RUNTIME_CONFIGURATION = "atlasRuntime"
         internal const val REMAPPED_CONFIGURATION = "atlasInternalRemapped"
+
+        internal const val ATLAS_CLIENT_RUNTIME = "clientRuntimeOnly"
+        internal const val ATLAS_SERVER_RUNTIME = "serverRuntimeOnly"
 
         internal const val ATLAS_ANNOTATIONS =
             "com.github.atlas-fw:annotations:a63069a7b4"
