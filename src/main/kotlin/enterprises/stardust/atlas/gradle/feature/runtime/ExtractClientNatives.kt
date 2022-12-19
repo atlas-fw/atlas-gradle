@@ -49,20 +49,6 @@ abstract class ExtractClientNatives @Inject constructor(
             }
 
             println("Extracting natives for ${library.name}")
-
-            /*config.forEach { file ->
-                library.downloads.classifiers
-                    ?.filter { it.key.startsWith("natives-") }
-                    ?.filter { it.key.endsWith(os.name.lowercase()) }
-                    ?.forEach files@{ (_, download) ->
-                        val fileName = download.path!!.substringAfterLast("/")
-                        if (file.name == fileName) {
-                            println("==>>>> Found ${file.path} for ${library.name}")
-                            inputs += project.files(file)
-                            return@files
-                        }
-                    }
-            }*/
         }
         inputFiles = inputs
     }
