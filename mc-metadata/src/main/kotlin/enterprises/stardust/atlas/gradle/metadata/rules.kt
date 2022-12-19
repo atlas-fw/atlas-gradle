@@ -19,33 +19,9 @@ package enterprises.stardust.atlas.gradle.metadata
 
 import com.fasterxml.jackson.annotation.JsonProperty
 
-open class RuleContext(
-    private val osName: String,
-    private val osVersion: String,
-    private val osArch: String,
-    flagArray: Array<String>,
-) {
-    constructor(
-        osName: String,
-        osVersion: String,
-        arch: String,
-        flagCollection: Collection<String>,
-    ) : this(osName, osVersion, arch, flagCollection.toTypedArray())
-
-    private val flags: List<String> =
-        listOf(*flagArray.distinct().toTypedArray())
-
-    fun matchesOs(osInfo: OSInfo): Boolean {
-        fun unequalsNotNull(val1: String?, val2: String) =
-            val1 != null && !val2.equals(val1, ignoreCase = true)
-
-        if (unequalsNotNull(osInfo.name, osName)) return false
-        if (unequalsNotNull(osInfo.version, osVersion)) return false
-        if (unequalsNotNull(osInfo.arch, osArch)) return false
-        return true
-    }
-
-    fun hasFeature(name: String): Boolean = this.flags.contains(name)
+interface RuleContext {
+    fun matchesOs(osInfo: OSInfo): Boolean
+    fun hasFeature(name: String): Boolean
 
     companion object
 }
@@ -69,7 +45,7 @@ enum class RuleAction(
  * @since 0.0.1
  */
 abstract class Ruleable {
-    protected abstract val rules: List<Rule>
+    abstract val rules: List<Rule>
 
     fun rulesApply(ctx: RuleContext): Boolean {
         if (rules.isEmpty()) return true

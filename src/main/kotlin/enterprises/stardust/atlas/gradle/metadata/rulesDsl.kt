@@ -19,13 +19,41 @@ package enterprises.stardust.atlas.gradle.metadata
 
 import fr.stardustenterprises.plat4k.Platform
 
+class RuleContextImpl(
+    private val platform: Platform,
+    private val flags: Set<String>,
+) : RuleContext {
+    override fun matchesOs(osInfo: OSInfo): Boolean {
+        val os = platform.operatingSystem
+        val arch = platform.architecture
+        val osVersion = System.getProperty("os.version", "unknown")
+
+        fun matchesSingular(osName: String, osArch: String): Boolean {
+            fun unequalsNotNull(val1: String?, val2: String) =
+                val1 != null && !val2.equals(val1, ignoreCase = true)
+
+            if (unequalsNotNull(osInfo.name, osName)) return false
+            if (unequalsNotNull(osInfo.version, osVersion)) return false
+            if (unequalsNotNull(osInfo.arch, osArch)) return false
+            return true
+        }
+
+        for (osName in os.aliases) {
+            for (archName in arch.aliases) {
+                if (matchesSingular(osName, archName)) return true
+            }
+        }
+        return false
+    }
+
+    override fun hasFeature(name: String): Boolean = this.flags.contains(name)
+}
+
 fun RuleContext.Companion.withCurrentPlatform(
-    flags: Array<String>
+    flags: Set<String> = emptySet(),
 ) = Platform.currentPlatform.run {
-    RuleContext(
-        operatingSystem.osName,
-        System.getProperty("os.version"), // TODO?
-        architecture.identifier,
+    RuleContextImpl(
+        this,
         flags,
     )
 }
