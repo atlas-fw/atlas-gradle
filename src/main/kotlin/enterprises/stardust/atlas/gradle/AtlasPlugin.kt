@@ -75,8 +75,11 @@ open class AtlasPlugin : StargradPlugin() {
                 mavenLocal()
                 mavenCentral()
                 maven {
-                    it.name = "Jitpack"
+                    it.name = "Atlas Jitpack"
                     it.url = uri("https://jitpack.io")
+                    it.content { repoContentDescriptor ->
+                        repoContentDescriptor.includeGroup("com.github.atlas-fw")
+                    }
                 }
             }
 
@@ -200,14 +203,13 @@ open class AtlasPlugin : StargradPlugin() {
     private fun Project.addToDependencies(
         libraries: List<Library>,
     ) {
-        val ctx = RuleContext.withCurrentPlatform()
-
-        libraries.filter { it.rulesApply(ctx) }.forEach { lib ->
-            val dep = dependencies.create(lib.name)
-            configurations.getByName(ATLAS_CLIENT_RUNTIME)
-                .dependencies
-                .add(dep)
-        }
+        libraries.filter { it.rulesApply(RuleContext.withCurrentPlatform()) }
+            .forEach { lib ->
+                val dep = dependencies.create(lib.name)
+                configurations.getByName(ATLAS_CLIENT_RUNTIME)
+                    .dependencies
+                    .add(dep)
+            }
     }
 
     @Suppress("DEPRECATION")
@@ -248,6 +250,7 @@ open class AtlasPlugin : StargradPlugin() {
                 tasks.create(
                     "extractNatives",
                     ExtractClientNatives::class.java,
+                    versionJson.id,
                     versionJson.libraries.filter { it.natives != null },
                 ).also { it.group = TASK_GROUP }
             } else null
@@ -302,8 +305,7 @@ open class AtlasPlugin : StargradPlugin() {
 
         try {
             val manifest = VersionManifest.fetch()
-            Files.write(
-                filePath,
+            filePath.writeBytes(
                 objectMapper.writeValueAsString(manifest).toByteArray(),
                 StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING,

@@ -58,6 +58,30 @@ fun VersionJson.Companion.fetch(url: URL, hash: String? = null): VersionJson {
 }
 
 fun VersionJson.Companion.from(json: String): VersionJson =
-    objectMapper.readValue(json, VersionJson::class.java)
+    objectMapper.readValue(json, VersionJson::class.java).run {
+        // FIXME shit code ahead
+
+        val dupes = mutableListOf<Library>()
+        val dupeNames = mutableListOf<String>()
+        this.libraries.forEach { lib ->
+            if (lib.name in dupeNames) return@forEach
+            val libDupes = this.libraries.filter { it.name == lib.name }
+            if (libDupes.size > 1) {
+                dupeNames.add(lib.name)
+                println("${libDupes.size - 1} duplicate(s) found in version manifest for ${lib.name}")
+                val sorted = libDupes.sortedByDescending {
+                    objectMapper.writeValueAsBytes(it).size
+                }
+                println("Keeping ${sorted[0]}")
+                dupes.addAll(sorted.drop(1))
+            }
+        }
+
+        if (dupes.size == 0) return this
+
+        return this.copy(
+            libraries = this.libraries.toMutableList().filter { it !in dupes }
+        )
+    }
 
 fun VersionJson.json(): String = objectMapper.writeValueAsString(this)
