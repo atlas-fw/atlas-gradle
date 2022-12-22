@@ -32,10 +32,9 @@ class RuleContextImpl(
             fun unequalsNotNull(val1: String?, val2: String) =
                 val1 != null && !val2.equals(val1, ignoreCase = true)
 
-            if (unequalsNotNull(osInfo.name, osName)) return false
-            if (unequalsNotNull(osInfo.version, osVersion)) return false
-            if (unequalsNotNull(osInfo.arch, osArch)) return false
-            return true
+            return !(unequalsNotNull(osInfo.name, osName) ||
+                unequalsNotNull(osInfo.version, osVersion) ||
+                unequalsNotNull(osInfo.arch, osArch))
         }
 
         for (osName in os.aliases) {
@@ -50,10 +49,17 @@ class RuleContextImpl(
 }
 
 fun RuleContext.Companion.withCurrentPlatform(
-    flags: Set<String> = emptySet(),
-) = Platform.currentPlatform.run {
+    flags: Set<String>,
+): RuleContext = Platform.currentPlatform.run {
     RuleContextImpl(
         this,
         flags,
     )
 }
+
+private val currentPlatformNoFlags by lazy {
+    RuleContext.withCurrentPlatform(emptySet())
+}
+
+fun RuleContext.Companion.withCurrentPlatform(): RuleContext =
+    currentPlatformNoFlags
