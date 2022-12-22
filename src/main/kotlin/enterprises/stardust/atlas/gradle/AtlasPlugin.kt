@@ -107,6 +107,9 @@ open class AtlasPlugin : StargradPlugin() {
 
             extensions.findByType(JavaPluginExtension::class.java)!!.sourceSets {
                 val facadesSet = maybeCreate(FACADES_SOURCESET)
+                val mainSet = getByName("main")
+
+                mainSet.compileClasspath += facadesSet.output
 
                 // This is pretty shit since it's also adding the kotlin runtime
                 // to the classpath of the mappings set. This is unfortunately
@@ -201,8 +204,6 @@ open class AtlasPlugin : StargradPlugin() {
 
         libraries.filter { it.rulesApply(ctx) }.forEach { lib ->
             val dep = dependencies.create(lib.name)
-            println(lib.name)
-            println(dep)
             configurations.getByName(ATLAS_CLIENT_RUNTIME)
                 .dependencies
                 .add(dep)

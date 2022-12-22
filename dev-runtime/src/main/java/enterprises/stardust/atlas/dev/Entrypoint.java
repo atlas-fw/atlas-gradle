@@ -41,7 +41,7 @@ public class Entrypoint {
         }
 
         String mainClassName = "net.minecraft.server.MinecraftServer";
-        mainClassName = "net.minecraft.client.main.Main";
+        //mainClassName = "net.minecraft.client.main.Main";
 
         System.out.println("Calling " + mainClassName);
         System.out.println("-----------------------------------");

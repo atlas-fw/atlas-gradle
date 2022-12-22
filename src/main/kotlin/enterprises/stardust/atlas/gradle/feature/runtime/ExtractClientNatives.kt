@@ -21,43 +21,87 @@ import enterprises.stardust.atlas.gradle.AtlasPlugin
 import enterprises.stardust.atlas.gradle.metadata.Library
 import enterprises.stardust.atlas.gradle.metadata.RuleContext
 import enterprises.stardust.atlas.gradle.metadata.withCurrentPlatform
+import fr.stardustenterprises.plat4k.EnumArchitecture
+import fr.stardustenterprises.plat4k.EnumOperatingSystem
 import fr.stardustenterprises.plat4k.Platform
 import org.gradle.api.DefaultTask
-import org.gradle.api.file.FileCollection
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
+import java.nio.file.Path
 import javax.inject.Inject
 
 abstract class ExtractClientNatives @Inject constructor(
-    libraries: List<Library>,
+    private val libraries: List<Library>,
 ) : DefaultTask() {
-
     @get:InputFiles
-    val inputFiles: FileCollection
+    val inputFiles: ConfigurableFileCollection
+
+    @Internal
+    private val ctx = RuleContext.withCurrentPlatform()
 
     init {
-        val ctx = RuleContext.withCurrentPlatform()
-        val os = Platform.currentPlatform.operatingSystem
         val config = project.configurations.getByName(
             AtlasPlugin.ATLAS_CLIENT_RUNTIME
         ).resolve()
+        val (os, arch) = Platform.currentPlatform.let {
+            it.operatingSystem to it.architecture
+        }
 
-        var inputs: FileCollection = project.files()
+        val files = mutableListOf<Path>()
         libraries.filter { it.rulesApply(ctx) }.forEach { library ->
-            if (library.natives.isNullOrEmpty()) {
+            if (library.extract == null || library.natives.isNullOrEmpty()) {
                 return@forEach
             }
+            val targetClassifier = findClassifier(library, os, arch)
+                ?: return@forEach
 
-            println("Extracting natives for ${library.name}")
+            val artifact = library.downloads.classifiers?.get(targetClassifier)
+                ?: return@forEach
+
+            val file = config.single {
+                it.name == artifact.path!!.substringAfterLast('/')
+            }
+            files.add(file.toPath())
         }
-        inputFiles = inputs
+        inputFiles = project.files(*files.toTypedArray())
     }
 
     @TaskAction
     fun run() {
-        val os = Platform.currentPlatform.operatingSystem
-        inputFiles.files.forEach {
-            println(" - $it")
+        val (os, arch) = Platform.currentPlatform.let {
+            it.operatingSystem to it.architecture
+        }
+        libraries.filter { it.rulesApply(ctx) }.forEach { library ->
+            if (library.extract == null || library.natives.isNullOrEmpty()) {
+                return@forEach
+            }
+            val targetClassifier = findClassifier(library, os, arch)
+                ?: return@forEach
+
+            val artifact = library.downloads.classifiers?.get(targetClassifier)
+                ?: return@forEach
+
+            if (inputFiles.any { it.name == artifact.path.substringAfterLast('/') })
+
         }
     }
+
+    private fun findClassifier(
+        library: Library,
+        os: EnumOperatingSystem,
+        arch: EnumArchitecture,
+    ): String? =
+        library.natives!!.let { natives ->
+            natives[os.name.lowercase()]
+                ?: os.aliases.mapNotNull { os ->
+                    arch.aliases.mapNotNull { arch ->
+                        natives["$os-$arch"].takeIf { !it.isNullOrBlank() }
+                    }.takeIf { it.isNotEmpty() }?.first()
+                }.takeIf { it.isNotEmpty() }?.first()
+                ?: natives["default"]
+        }
+
 }
+
