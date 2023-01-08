@@ -19,11 +19,10 @@ package enterprises.stardust.atlas.gradle.feature.runtime
 
 import enterprises.stardust.atlas.gradle.AtlasCache
 import enterprises.stardust.atlas.gradle.AtlasPlugin
+import enterprises.stardust.atlas.gradle.findClassifier
 import enterprises.stardust.atlas.gradle.metadata.Library
 import enterprises.stardust.atlas.gradle.metadata.RuleContext
 import enterprises.stardust.atlas.gradle.metadata.withCurrentPlatform
-import fr.stardustenterprises.plat4k.EnumArchitecture
-import fr.stardustenterprises.plat4k.EnumOperatingSystem
 import fr.stardustenterprises.plat4k.Platform
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
@@ -71,6 +70,9 @@ abstract class ExtractClientNatives @Inject constructor(
             val artifact = library.downloads.classifiers?.get(targetClassifier)
                 ?: return@forEach
 
+            println(library)
+            println(artifact.path)
+
             val file = config.single {
                 it.name == artifact.path!!.substringAfterLast('/')
             }
@@ -116,19 +118,4 @@ abstract class ExtractClientNatives @Inject constructor(
                 }
         }
     }
-
-    private fun findClassifier(
-        library: Library,
-        os: EnumOperatingSystem,
-        arch: EnumArchitecture,
-    ): String? =
-        library.natives!!.let { natives ->
-            natives[os.name.lowercase()]
-                ?: os.aliases.mapNotNull { os ->
-                    arch.aliases.mapNotNull { arch ->
-                        natives["$os-$arch"].takeIf { !it.isNullOrBlank() }
-                    }.takeIf { it.isNotEmpty() }?.first()
-                }.takeIf { it.isNotEmpty() }?.first()
-                ?: natives["default"]
-        }
 }

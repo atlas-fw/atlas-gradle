@@ -33,6 +33,7 @@ import enterprises.stardust.atlas.gradle.metadata.fetch
 import enterprises.stardust.atlas.gradle.metadata.from
 import enterprises.stardust.atlas.gradle.metadata.withCurrentPlatform
 import enterprises.stardust.stargrad.StargradPlugin
+import fr.stardustenterprises.plat4k.Platform
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Dependency
 import org.gradle.api.file.DuplicatesStrategy
@@ -202,12 +203,29 @@ open class AtlasPlugin : StargradPlugin() {
         libraries: List<Library>,
     ) {
         val context = RuleContext.withCurrentPlatform()
-        libraries.filter { it.rulesApply(context) }
+        val clientRuntime = configurations.getByName(ATLAS_CLIENT_RUNTIME)
+        val (os, arch) = Platform.currentPlatform.let {
+            it.operatingSystem to it.architecture
+        }
+
+        libraries
+            .filter { it.rulesApply(context) }
             .forEach { lib ->
-                val dep = dependencies.create(lib.name)
-                configurations.getByName(ATLAS_CLIENT_RUNTIME)
-                    .dependencies
-                    .add(dep)
+                if (lib.downloads.artifact != null) {
+                    clientRuntime.dependencies.add(
+                        dependencies.create(lib.name)
+                    )
+                }
+
+                if (!lib.natives.isNullOrEmpty() && !lib.downloads.classifiers.isNullOrEmpty()) {
+                    val classifier = findClassifier(lib, os, arch)
+                    lib.downloads.classifiers!![classifier]
+                        ?.apply {
+                            clientRuntime.dependencies.add(
+                                dependencies.create("${lib.name}:$classifier")
+                            )
+                        }
+                }
             }
     }
 
