@@ -22,6 +22,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.google.common.hash.Hashing
 import enterprises.stardust.atlas.gradle.feature.remap.RemapJar
 import enterprises.stardust.atlas.gradle.feature.runtime.Download
+import enterprises.stardust.atlas.gradle.feature.runtime.DownloadClientAssets
 import enterprises.stardust.atlas.gradle.feature.runtime.ExtractClientNatives
 import enterprises.stardust.atlas.gradle.feature.runtime.runtimeJar
 import enterprises.stardust.atlas.gradle.feature.stubgen.GenStubs
@@ -259,10 +260,21 @@ open class AtlasPlugin : StargradPlugin() {
             hash,
         ).also { it.group = TASK_GROUP }
 
-        val extractNatives =
+        val downloadClientAssets =
             if (side == "client") {
                 tasks.create(
-                    "extractNatives",
+                    "downloadClientAssets",
+                    DownloadClientAssets::class.java,
+                    versionJson.assets, // assetIndexId
+                    versionJson.logging?.client?.type, // loggingFileType
+                    versionJson.logging?.client?.file, // loggingFile
+                ).also { it.group = TASK_GROUP }
+            } else null
+
+        val extractClientNatives =
+            if (side == "client") {
+                tasks.create(
+                    "extractClientNatives",
                     ExtractClientNatives::class.java,
                     versionJson.id,
                     versionJson.libraries.filter { it.natives != null },
@@ -275,7 +287,8 @@ open class AtlasPlugin : StargradPlugin() {
         ) {
             group = TASK_GROUP
             dependsOn(downloadTask)
-            extractNatives?.let { dependsOn(it) }
+            downloadClientAssets?.let { dependsOn(it) }
+            extractClientNatives?.let { dependsOn(it) }
 
             mainClass.set("enterprises.stardust.atlas.dev.Entrypoint")
             workingDir = projectDir.resolve("run").toPath()
@@ -307,7 +320,15 @@ open class AtlasPlugin : StargradPlugin() {
             )
             jvmArgs = buildList<String> {
                 if (side == "client") {
-                    add("-Djava.library.path=${extractNatives!!.outputDir.absolutePathString()}")
+                    add("-Djava.library.path=${extractClientNatives!!.outputDir.absolutePathString()}")
+                    if (versionJson.logging?.client != null) {
+                        add(
+                            versionJson.logging!!.client!!.argument.replace(
+                                "\${path}",
+                                downloadClientAssets!!.loggingFile!!.absolutePathString()
+                            )
+                        )
+                    }
                 }
             }
 

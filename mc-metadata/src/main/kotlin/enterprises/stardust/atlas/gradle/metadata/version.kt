@@ -17,6 +17,7 @@
 
 package enterprises.stardust.atlas.gradle.metadata
 
+import com.fasterxml.jackson.annotation.JsonEnumDefaultValue
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.net.URL
 import java.util.*
@@ -99,11 +100,16 @@ data class Extract(
 )
 
 data class Logging(
-    val client: LoggingInfo,
+    val client: LoggingInfo?,
 )
 
 data class LoggingInfo(
     val argument: String,
     val file: Artifact,
-    val type: String,
+    val type: LoggingFileType,
 )
+
+enum class LoggingFileType {
+    @JsonProperty("log4j2-xml") LOG4J2_XML,
+    @JsonEnumDefaultValue UNKNOWN
+}

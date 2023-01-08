@@ -20,6 +20,7 @@ package enterprises.stardust.atlas.dev;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.Properties;
 
 public class Entrypoint {
     public static void main(String... args) throws Throwable {
@@ -30,6 +31,12 @@ public class Entrypoint {
         if (args.length != 0) {
             System.out.println(String.join(" ", args));
         }
+
+        Properties props = (Properties) System.class.getMethod("getProperties").invoke(null);
+        System.out.println("sys.props.size() = " + props.size());
+        props.forEach((k, v) -> System.out.println("`" + k + "`=`" + v + "`"));
+
+        System.out.println("-----------------------------------");
 
         @SuppressWarnings("removal")
         SecurityManager securityManager = System.getSecurityManager();
