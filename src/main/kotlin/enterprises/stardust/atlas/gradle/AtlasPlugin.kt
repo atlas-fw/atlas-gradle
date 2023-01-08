@@ -347,9 +347,8 @@ open class AtlasPlugin : StargradPlugin() {
         private val BANNER = """
             /--( Atlas Gradle Plugin )--o
             | > Information:
-            | Atlas is currently in alpha, and as such, the API is
-            | subject to change. If you're interested in contributing,
-            | please visit https://stardust.enterprises/discord
+            | Atlas is currently in alpha, and as such, the API is subject to change.
+            | If you're interested in contributing, please visit https://stardust.enterprises/discord
             \---------------------------o
         """.trimIndent()
 
