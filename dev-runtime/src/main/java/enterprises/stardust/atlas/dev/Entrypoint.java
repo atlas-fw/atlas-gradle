@@ -22,15 +22,19 @@ import java.net.URL;
 import java.net.URLClassLoader;
 
 public class Entrypoint {
-    public static void main(String... args) {
+    public static void main(String... args) throws Throwable {
         System.out.println("Atlas Framework Development Runtime");
         System.out.println("-----------------------------------");
+
         System.out.println("args.length = " + args.length);
         if (args.length != 0) {
             System.out.println(String.join(" ", args));
         }
 
+        @SuppressWarnings("removal")
+        SecurityManager securityManager = System.getSecurityManager();
         ClassLoader classLoader = Entrypoint.class.getClassLoader();
+        System.out.println("SecurityManager: " + securityManager);
         System.out.println("Classloader: " + classLoader + " / " + classLoader.getClass().getName());
         if (classLoader instanceof URLClassLoader) {
             URLClassLoader urlClassLoader = (URLClassLoader) classLoader;
@@ -40,17 +44,33 @@ public class Entrypoint {
             }
         }
 
+        System.out.println("-----------------------------------");
+
+        String atlasSide = getProperty("atlas.loader.side", "client");
         String mainClassName = "net.minecraft.server.MinecraftServer";
-        //mainClassName = "net.minecraft.client.main.Main";
+        if ("client".equals(atlasSide)) {
+            mainClassName = "net.minecraft.client.main.Main";
+        }
 
         System.out.println("Calling " + mainClassName);
         System.out.println("-----------------------------------");
         try {
-            Class<?> mainClass = Class.forName(mainClassName);
+            Class<?> mainClass = Class.forName(mainClassName, true, classLoader);
             Method mainMethod = mainClass.getMethod("main", String[].class);
             mainMethod.invoke(null, (Object) args);
         } catch (ReflectiveOperationException reflectiveOperationException) {
             reflectiveOperationException.printStackTrace();
+        }
+    }
+
+    private static String getProperty(String name, String defaultValue) {
+        try {
+            Class<System> systemClass = System.class;
+            Method m_getProperty = systemClass.getDeclaredMethod("getProperty", String.class, String.class);
+            m_getProperty.setAccessible(true);
+            return (String) m_getProperty.invoke(null, name, defaultValue);
+        } catch (ReflectiveOperationException exception) {
+            throw new RuntimeException(exception);
         }
     }
 }

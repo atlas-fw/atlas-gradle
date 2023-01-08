@@ -43,36 +43,6 @@ object AtlasCache {
             .also { it.createDirectories() }
     }
 
-    fun cacheDependency(
-        dependencyNotation: String,
-        url: URL,
-        hashProvider: (Path) -> String,
-    ): Path {
-        val data = dependencyNotation.split(":")
-        if (data.size < 3 || data.size > 5) {
-            throw IllegalArgumentException(
-                "Invalid dependency: $dependencyNotation"
-            )
-        }
-        val (folder, artifactFileName) =
-            resolveDependencyPath(dependencyNotation)
-        return cacheFile(folder, artifactFileName, url, hashProvider)
-    }
-
-    fun cacheDependency(
-        group: String,
-        name: String,
-        version: String,
-        classifier: String? = null,
-        extension: String = "jar",
-        url: URL,
-        hashProvider: (Path) -> String,
-    ): Path {
-        val (folder, artifactFileName) =
-            resolveDependencyPath(group, name, version, classifier, extension)
-        return cacheFile(folder, artifactFileName, url, hashProvider)
-    }
-
     /**
      * Caches a file from a URL.
      *

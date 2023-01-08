@@ -29,6 +29,7 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
@@ -44,8 +45,11 @@ abstract class ExtractClientNatives @Inject constructor(
     @get:InputFiles
     val inputFiles: ConfigurableFileCollection
 
-    @Internal
-    private val ctx = RuleContext.withCurrentPlatform()
+    @get:Internal
+    val ctx = RuleContext.withCurrentPlatform()
+
+    @get:OutputDirectory
+    val outputDir: Path
 
     init {
         val config = project.configurations.getByName(
@@ -57,7 +61,6 @@ abstract class ExtractClientNatives @Inject constructor(
 
         val files = mutableListOf<Path>()
 
-        config.forEach { println(it) }
         libraries.filter { it.rulesApply(ctx) }.forEach { library ->
             if (library.extract == null || library.natives.isNullOrEmpty()) {
                 return@forEach
@@ -68,14 +71,14 @@ abstract class ExtractClientNatives @Inject constructor(
             val artifact = library.downloads.classifiers?.get(targetClassifier)
                 ?: return@forEach
 
-            println("Searching for ${artifact.path!!.substringAfterLast('/')}")
-
             val file = config.single {
                 it.name == artifact.path!!.substringAfterLast('/')
             }
             files.add(file.toPath())
         }
         inputFiles = project.files(*files.toTypedArray())
+        outputDir = AtlasCache.cacheDir.resolve("natives/$versionId")
+            .createDirectories()
     }
 
     @TaskAction
@@ -84,38 +87,34 @@ abstract class ExtractClientNatives @Inject constructor(
             it.operatingSystem to it.architecture
         }
 
-        val nativesPath: Path = AtlasCache.cacheDir
-            .resolve("natives/$versionId").createDirectories()
-
-        libraries.filter { it.rulesApply(ctx) }
-            .forEach { lib ->
-                if (lib.extract == null || lib.natives.isNullOrEmpty()) {
-                    return@forEach
-                }
-
-                val targetClassifier = findClassifier(lib, os, arch)
-                    ?: return@forEach
-
-                val artifact = lib.downloads.classifiers?.get(targetClassifier)
-                    ?: return@forEach
-
-                inputFiles.find { it.name == artifact.path?.substringAfterLast('/') }
-                    ?.let { file ->
-                        JarFile(file).use { jar ->
-                            jar.entries().asSequence()
-                                .filter { lib.extract!!.exclude.none { e -> it.name.startsWith(e) } }
-                                .forEach { entry ->
-                                    jar.getInputStream(entry).use {
-                                        nativesPath.resolve(entry.name).writeBytes(
-                                            it.readBytes(),
-                                            StandardOpenOption.CREATE,
-                                            StandardOpenOption.TRUNCATE_EXISTING,
-                                        )
-                                    }
-                                }
-                        }
-                    }
+        libraries.filter { it.rulesApply(ctx) }.forEach { lib ->
+            if (lib.extract == null || lib.natives.isNullOrEmpty()) {
+                return@forEach
             }
+
+            val targetClassifier = findClassifier(lib, os, arch)
+                ?: return@forEach
+
+            val artifact = lib.downloads.classifiers?.get(targetClassifier)
+                ?: return@forEach
+
+            inputFiles.find { it.name == artifact.path?.substringAfterLast('/') }
+                ?.let { file ->
+                    JarFile(file).use { jar ->
+                        jar.entries().asSequence()
+                            .filter { lib.extract!!.exclude.none { e -> it.name.startsWith(e) } }
+                            .forEach { entry ->
+                                jar.getInputStream(entry).use {
+                                    outputDir.resolve(entry.name).writeBytes(
+                                        it.readBytes(),
+                                        StandardOpenOption.CREATE,
+                                        StandardOpenOption.TRUNCATE_EXISTING,
+                                    )
+                                }
+                            }
+                    }
+                }
+        }
     }
 
     private fun findClassifier(
@@ -132,6 +131,4 @@ abstract class ExtractClientNatives @Inject constructor(
                 }.takeIf { it.isNotEmpty() }?.first()
                 ?: natives["default"]
         }
-
 }
-

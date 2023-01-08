@@ -32,7 +32,7 @@ const val MANIFEST_URL =
  * @since 0.0.1
  */
 data class VersionManifest(
-    val latest: LatestMetadata,
+    val latest: LatestMetadata?,
     val versions: List<VersionMetadata>
 ) { companion object }
 

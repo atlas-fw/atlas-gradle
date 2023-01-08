@@ -6,7 +6,7 @@ import java.time.format.DateTimeFormatter
 plugins {
     with(Plugins) {
         // Language Plugins
-        kotlin("jvm") version KOTLIN
+        id("org.gradle.kotlin.kotlin-dsl") version "4.0.0-rc-2"
 
         // Git Repo Information
         id("org.ajoberstar.grgit") version GRGIT
@@ -125,6 +125,7 @@ allprojects {
         if (project.name != "dev-runtime") {
             compileKotlin {
                 kotlinOptions {
+                    languageVersion = "1.7"
                     jvmTarget = targetVersion
                     freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
                 }
@@ -135,6 +136,15 @@ allprojects {
             targetCompatibility = targetVersion
             sourceCompatibility = sourceVersion
         }
+    }
+}
+
+subprojects {
+    group = Coordinates.GROUP
+    version = rootProject.version
+
+    repositories {
+        mavenCentral()
     }
 }
 

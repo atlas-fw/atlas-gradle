@@ -32,9 +32,11 @@ class RuleContextImpl(
             fun unequalsNotNull(val1: String?, val2: String) =
                 val1 != null && !val2.equals(val1, ignoreCase = true)
 
-            return !(unequalsNotNull(osInfo.name, osName) ||
-                unequalsNotNull(osInfo.version, osVersion) ||
-                unequalsNotNull(osInfo.arch, osArch))
+            return !(
+                unequalsNotNull(osInfo.name, osName) ||
+                    unequalsNotNull(osInfo.version, osVersion) ||
+                    unequalsNotNull(osInfo.arch, osArch)
+                )
         }
 
         for (osName in os.aliases) {
