@@ -129,7 +129,8 @@ object AtlasCache {
         classifier: String? = null,
         extension: String = "jar",
     ): Pair<Path, String> {
-        val folder = cacheDir.resolve(group.replace(".", File.separator))
+        val folder = cacheDir.resolve("versions")
+            .resolve(group.replace(".", File.separator))
             .resolve(name)
             .resolve(version)
         val artifactName = "$name-$version" +
